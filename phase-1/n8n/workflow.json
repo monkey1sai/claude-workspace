@@ -1,0 +1,121 @@
+{
+  "name": "Mattermost AI Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mattermost-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7928fe47-7a9f-4cc8-988e-6110938d24f2",
+      "name": "Mattermost Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "c21b0d84-1f0e-48c2-b811-6ce96084343c"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst text = body.text || '';\nconst query = text.replace(/@ai-assistant/gi, '').trim();\nconst channelId = body.channel_id;\nconst userName = body.user_name || 'user';\nreturn [{json: {query: query || 'hello', channelId, userName}}];"
+      },
+      "id": "7f2edfb5-0d2d-4bdd-b0e2-172562a84de4",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3080/v1/chat-messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer <DIFY_APP_API_KEY>"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ inputs: {}, query: $json.query, response_mode: 'streaming', user: $json.userName }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "a57f3416-bcea-449d-a24f-d5f8804c8352",
+      "name": "Call Dify API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse SSE text response from Dify\nconst raw = $input.first().json.data || $input.first().json.body || '';\nconst text = typeof raw === 'string' ? raw : JSON.stringify(raw);\n\nlet answer = '';\nconst lines = text.split('\\n');\nfor (const line of lines) {\n  if (line.startsWith('data: ')) {\n    try {\n      const data = JSON.parse(line.substring(6));\n      if (data.answer) {\n        answer += data.answer;\n      }\n    } catch (e) {}\n  }\n}\n\nif (!answer) {\n  answer = 'Sorry, I could not process your request.';\n}\n\nconst channelId = $('Extract Message').first().json.channelId;\nreturn [{json: {answer, channelId}}];"
+      },
+      "id": "153d0de6-bbfb-4e51-acd9-2a10da667649",
+      "name": "Parse SSE Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8065/api/v4/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer <MM_BOT_TOKEN>"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $json.channelId, message: $json.answer }) }}",
+        "options": {}
+      },
+      "id": "e49e36fc-07c5-40e9-918f-3e1e17a7d091",
+      "name": "Reply to Mattermost",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"text\": \"ok\"}"
+      },
+      "id": "c247e352-8418-4a62-8486-ad748d152ff6",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1350, 300]
+    }
+  ],
+  "connections": {
+    "Mattermost Webhook": {
+      "main": [[{"node": "Extract Message", "type": "main", "index": 0}]]
+    },
+    "Extract Message": {
+      "main": [[{"node": "Call Dify API", "type": "main", "index": 0}]]
+    },
+    "Call Dify API": {
+      "main": [[{"node": "Parse SSE Response", "type": "main", "index": 0}]]
+    },
+    "Parse SSE Response": {
+      "main": [[{"node": "Reply to Mattermost", "type": "main", "index": 0}]]
+    },
+    "Reply to Mattermost": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

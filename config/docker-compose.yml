@@ -1,0 +1,73 @@
+# 企業 AI 平台 — Docker Compose
+# 包含 n8n + Dify + PostgreSQL + Redis
+#
+# 使用方式：
+#   cp .env.example .env
+#   # 編輯 .env 設定密碼和 API Key
+#   docker compose up -d
+
+version: '3.8'
+
+services:
+  # ============================================
+  # n8n — 自動化協調層
+  # http://localhost:5678
+  # ============================================
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:?Set N8N_PASSWORD in .env}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - GENERIC_TIMEZONE=Asia/Taipei
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - ai-platform
+    depends_on:
+      - redis
+
+  # ============================================
+  # Redis — 快取 + 額度計數
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai-platform
+
+  # ============================================
+  # PostgreSQL — Dify + 審計日誌
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-dify}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: dify
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ai-platform
+
+volumes:
+  n8n_data:
+  redis_data:
+  postgres_data:
+
+networks:
+  ai-platform:
+    driver: bridge

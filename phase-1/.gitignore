@@ -1,0 +1,10 @@
+# Sensitive files
+credentials.env
+.env
+*/.env
+
+# Dify data
+dify/dify/docker/volumes/
+
+# Docker volumes (if local)
+*/data/

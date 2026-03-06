@@ -1,0 +1,35 @@
+# === Sensitive files ===
+.env
+*/.env
+**/.env
+credentials.env
+**/credentials.env
+
+# === Docker volumes (runtime data, not source) ===
+**/volumes/
+**/data/
+
+# === Dify — 整個 clone 排除，部署時重新 git clone ===
+phase-1/dify/
+
+# === Claude Code local settings ===
+.claude/settings.local.json
+.claude/worktrees/
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Editor files ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === Large binary files ===
+docs/*.pdf
+
+# === Node.js ===
+node_modules/

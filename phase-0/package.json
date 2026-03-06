@@ -1,0 +1,12 @@
+{
+  "name": "phase-0",
+  "version": "1.0.0",
+  "description": "Express hello world API",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

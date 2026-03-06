@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Hooks & MCP 新手完全指南</title>
+<style>
+  /* === Reset & Base === */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --color-bg: #ffffff;
+    --color-text: #1a1a2e;
+    --color-muted: #555;
+    --color-accent: #4361ee;
+    --color-accent-light: #eef1ff;
+    --color-success: #06d6a0;
+    --color-warn: #ffd166;
+    --color-danger: #ef476f;
+    --color-code-bg: #f4f5f7;
+    --color-border: #e0e0e0;
+    --color-sidebar: #f8f9fa;
+    --font-sans: "Noto Sans TC", "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+  }
+
+  html { font-size: 15px; }
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-text);
+    background: var(--color-bg);
+    line-height: 1.7;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+
+  /* === Print Styles === */
+  @media print {
+    html { font-size: 12px; }
+    body { padding: 0; max-width: 100%; }
+    .page-break { page-break-before: always; }
+    .no-print { display: none !important; }
+    a { color: var(--color-text) !important; text-decoration: none !important; }
+    .toc { page-break-after: always; }
+    h1, h2, h3 { page-break-after: avoid; }
+    pre, table, .callout, .step-box { page-break-inside: avoid; }
+  }
+
+  /* === Typography === */
+  h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--color-accent);
+    margin-bottom: 0.3em;
+    letter-spacing: -0.02em;
+  }
+  h1 .subtitle {
+    display: block;
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--color-muted);
+    margin-top: 0.3em;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-top: 2.5em;
+    margin-bottom: 0.6em;
+    padding-bottom: 0.3em;
+    border-bottom: 3px solid var(--color-accent);
+  }
+
+  h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-top: 1.8em;
+    margin-bottom: 0.4em;
+    color: #333;
+  }
+
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 1.4em;
+    margin-bottom: 0.3em;
+    color: var(--color-accent);
+  }
+
+  p { margin-bottom: 0.8em; }
+
+  a { color: var(--color-accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  strong { font-weight: 700; }
+  em { font-style: italic; color: var(--color-muted); }
+
+  /* === Code === */
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--color-code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+  }
+
+  pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 1em 1.2em;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin: 1em 0;
+    position: relative;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+
+  /* Syntax highlight classes */
+  .kw { color: #cba6f7; }  /* keyword */
+  .str { color: #a6e3a1; }  /* string */
+  .cmt { color: #6c7086; font-style: italic; }  /* comment */
+  .fn { color: #89b4fa; }   /* function */
+  .num { color: #fab387; }  /* number */
+  .op { color: #89dceb; }   /* operator */
+  .var { color: #f5c2e7; }  /* variable */
+
+  /* === Tables === */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 0.92rem;
+  }
+  thead th {
+    background: var(--color-accent);
+    color: white;
+    font-weight: 600;
+    text-align: left;
+    padding: 0.6em 0.8em;
+  }
+  thead th:first-child { border-radius: 6px 0 0 0; }
+  thead th:last-child { border-radius: 0 6px 0 0; }
+  tbody td {
+    padding: 0.5em 0.8em;
+    border-bottom: 1px solid var(--color-border);
+  }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tbody tr:hover { background: var(--color-accent-light); }
+
+  /* === Callout boxes === */
+  .callout {
+    border-left: 4px solid;
+    padding: 1em 1.2em;
+    margin: 1.2em 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.94rem;
+  }
+  .callout-info { border-color: var(--color-accent); background: #f0f4ff; }
+  .callout-warn { border-color: var(--color-warn); background: #fff9e6; }
+  .callout-success { border-color: var(--color-success); background: #e8fbf3; }
+  .callout-danger { border-color: var(--color-danger); background: #fef0f3; }
+  .callout .callout-title {
+    font-weight: 700;
+    margin-bottom: 0.3em;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+  }
+
+  /* === Step boxes === */
+  .step-box {
+    border: 2px solid var(--color-border);
+    border-radius: 10px;
+    padding: 1.2em 1.4em;
+    margin: 1em 0;
+    position: relative;
+  }
+  .step-box .step-num {
+    position: absolute;
+    top: -14px;
+    left: 16px;
+    background: var(--color-accent);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+  }
+  .step-box .step-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin-bottom: 0.5em;
+    padding-left: 1.2em;
+  }
+
+  /* === Flow diagrams (ASCII art in pre) === */
+  .flow-diagram {
+    background: var(--color-sidebar);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    padding: 1.2em;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  /* === Table of contents === */
+  .toc {
+    background: var(--color-sidebar);
+    border-radius: 10px;
+    padding: 1.5em 2em;
+    margin: 2em 0;
+  }
+  .toc h3 { margin-top: 0; color: var(--color-accent); }
+  .toc ol { padding-left: 1.5em; }
+  .toc li { margin: 0.4em 0; }
+  .toc ol ol { margin-top: 0.3em; }
+
+  /* === Diagram container === */
+  .diagram {
+    margin: 1.5em 0;
+    overflow-x: auto;
+  }
+  .diagram pre {
+    background: #f8f9fa;
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    text-align: left;
+    white-space: pre;
+    font-size: 0.8rem;
+  }
+
+  /* === Lists === */
+  ul, ol { padding-left: 1.5em; margin-bottom: 0.8em; }
+  li { margin-bottom: 0.3em; }
+
+  /* === Horizontal rules === */
+  hr {
+    border: none;
+    border-top: 2px solid var(--color-border);
+    margin: 2em 0;
+  }
+
+  /* === Badge === */
+  .badge {
+    display: inline-block;
+    padding: 0.15em 0.6em;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+  .badge-required { background: #fef0f3; color: #ef476f; }
+  .badge-optional { background: #e8fbf3; color: #06856a; }
+  .badge-auto { background: #eef1ff; color: #4361ee; }
+
+  /* === Cover page === */
+  .cover {
+    text-align: center;
+    padding: 80px 0 60px;
+  }
+  .cover h1 { font-size: 2.6rem; margin-bottom: 0.1em; }
+  .cover .version { color: var(--color-muted); font-size: 0.95rem; margin-top: 1em; }
+
+  /* === Footer === */
+  .footer {
+    margin-top: 4em;
+    padding-top: 1.5em;
+    border-top: 2px solid var(--color-border);
+    text-align: center;
+    color: var(--color-muted);
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== COVER ==================== -->
+<div class="cover">
+  <h1>Claude Code<br>Hooks & MCP 完全指南</h1>
+  <p style="font-size:1.2rem; color: var(--color-muted); margin-top: 0.5em;">
+    從零開始理解 Hook 原理、MCP 架構、Auto-Loop 控制流
+  </p>
+  <p class="version">
+    適用版本：sd0x-dev-flow v1.8.8 ・ Claude Code 2.1+<br>
+    文件日期：2026-03-05
+  </p>
+</div>
+
+<!-- ==================== TOC ==================== -->
+<div class="toc">
+  <h3>目錄</h3>
+  <ol>
+    <li><a href="#ch1">概念總覽：三大系統如何協作</a></li>
+    <li><a href="#ch2">Claude Code Hooks 完全解析</a>
+      <ol>
+        <li><a href="#ch2-1">什麼是 Hook？（類比解釋）</a></li>
+        <li><a href="#ch2-2">Hook 的生命週期事件</a></li>
+        <li><a href="#ch2-3">資料流：stdin / stdout / exit code</a></li>
+        <li><a href="#ch2-4">hooks.json 註冊結構</a></li>
+        <li><a href="#ch2-5">實戰：從零寫一個 Hook</a></li>
+        <li><a href="#ch2-6">本專案的 5 個 Hooks 詳解</a></li>
+      </ol>
+    </li>
+    <li><a href="#ch3">Claude Code 作為 MCP</a>
+      <ol>
+        <li><a href="#ch3-1">MCP 協定基礎</a></li>
+        <li><a href="#ch3-2">Claude Code 作為 MCP Client</a></li>
+        <li><a href="#ch3-3">Claude Code 作為 MCP Server</a></li>
+        <li><a href="#ch3-4">Hooks vs MCP 比較</a></li>
+      </ol>
+    </li>
+    <li><a href="#ch4">Auto-Loop 控制流深度解析</a>
+      <ol>
+        <li><a href="#ch4-1">雙層防禦架構</a></li>
+        <li><a href="#ch4-2">完整資料流追蹤（逐步）</a></li>
+        <li><a href="#ch4-3">Sentinel 標準與解析</a></li>
+        <li><a href="#ch4-4">失敗路徑與安全閥</a></li>
+      </ol>
+    </li>
+    <li><a href="#ch5">動手做：新手實作練習</a></li>
+    <li><a href="#ch6">常見問題 FAQ</a></li>
+  </ol>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ==================== CH1 ==================== -->
+<h2 id="ch1">1. 概念總覽：三大系統如何協作</h2>
+
+<p>在開始細節之前，先建立全局觀。Claude Code 有三大子系統，各司其職：</p>
+
+<div class="diagram">
+<pre>
+┌──────────────────────────────────────────────────────────────┐
+│                      Claude Code Agent                        │
+│                                                               │
+│   ┌─── MCP（能力擴展）──────────┐                             │
+│   │                              │                             │
+│   │  「我能做什麼？」             │   連接外部工具：             │
+│   │   ← 被動回應 Claude 的請求   │   Codex、GitHub、DB...      │
+│   │                              │                             │
+│   └──────────────────────────────┘                             │
+│                                                               │
+│   ┌─── Hooks（行為控制）─────────┐                             │
+│   │                              │                             │
+│   │  「我該怎麼做？」             │   攔截、監控、強制：         │
+│   │   ← 自動觸發的事件攔截器     │   格式化、品質閘門、安全防護 │
+│   │                              │                             │
+│   └──────────────────────────────┘                             │
+│                                                               │
+│   ┌─── Rules（行為指導）─────────┐                             │
+│   │                              │                             │
+│   │  「我應該遵守什麼？」         │   常駐規則：                │
+│   │   ← 寫在 CLAUDE.md 和 rules/ │   auto-loop、security...   │
+│   │                              │                             │
+│   └──────────────────────────────┘                             │
+└──────────────────────────────────────────────────────────────┘
+</pre>
+</div>
+
+<div class="callout callout-info">
+  <div class="callout-title">💡 一句話記憶</div>
+  <p><strong>MCP</strong> 給 Claude 裝上新工具（「能做什麼」）<br>
+     <strong>Hooks</strong> 在 Claude 每個動作前後加上攔截器（「該怎麼做」）<br>
+     <strong>Rules</strong> 告訴 Claude 應該遵守的規則（「應該做什麼」）</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ==================== CH2 ==================== -->
+<h2 id="ch2">2. Claude Code Hooks 完全解析</h2>
+
+<!-- CH2-1 -->
+<h3 id="ch2-1">2.1 什麼是 Hook？（類比解釋）</h3>
+
+<p>想像 Claude Code 是一間餐廳的廚師：</p>
+
+<table>
+  <thead>
+    <tr><th>餐廳類比</th><th>Claude Code 對應</th><th>Hook 角色</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>客人點餐</td><td>使用者輸入 prompt</td><td><code>UserPromptSubmit</code> — 可以拒收不合理的訂單</td></tr>
+    <tr><td>廚師準備切菜</td><td>Claude 要呼叫 Edit 工具</td><td><code>PreToolUse</code> — 檢查食材是否安全</td></tr>
+    <tr><td>菜做好了</td><td>工具執行完成</td><td><code>PostToolUse</code> — 加上擺盤（格式化）、記錄品質</td></tr>
+    <tr><td>廚師想下班</td><td>Claude 要停止回應</td><td><code>Stop</code> — 檢查所有訂單是否完成</td></tr>
+  </tbody>
+</table>
+
+<p><strong>技術定義</strong>：Hook 是一個 <strong>shell 腳本</strong>（或 HTTP endpoint），在 Claude Code 生命週期的特定節點自動執行。它透過 <strong>stdin</strong> 收到 JSON 資料，透過 <strong>exit code</strong> 和 <strong>stdout</strong> 回覆決策。</p>
+
+<!-- CH2-2 -->
+<h3 id="ch2-2">2.2 Hook 的生命週期事件</h3>
+
+<p>Claude Code 提供多個生命週期事件，以下是最常用的：</p>
+
+<div class="diagram">
+<pre>
+使用者開啟 Claude Code
+        │
+        ▼
+  ┌─────────────┐
+  │ SessionStart │ ← 一次性初始化（注入環境、設定）
+  └──────┬──────┘
+         │
+         ▼  使用者輸入 prompt
+  ┌──────────────────┐
+  │ UserPromptSubmit  │ ← 可阻斷：拒絕不合理的 prompt
+  └──────┬───────────┘
+         │
+         ▼  Claude 要呼叫工具（Edit、Bash 等）
+  ┌──────────────┐
+  │  PreToolUse   │ ← 可阻斷：拒絕危險操作（例如編輯 .env）
+  └──────┬───────┘
+         │
+         ▼  工具實際執行
+  ┌──────────────┐
+  │  PostToolUse  │ ← 不可阻斷，但可回饋資訊（格式化、記錄狀態）
+  └──────┬───────┘
+         │
+         ▼  Claude 準備停止回應
+  ┌──────────────┐
+  │     Stop      │ ← 可阻斷：品質關卡未通過就不讓停
+  └──────────────┘
+</pre>
+</div>
+
+<table>
+  <thead>
+    <tr><th>事件</th><th>觸發時機</th><th>能否阻斷？</th><th>典型用途</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>SessionStart</code></td><td>Session 啟動</td><td>否</td><td>注入命名空間提示</td></tr>
+    <tr><td><code>UserPromptSubmit</code></td><td>使用者送出 prompt</td><td>✅ 是</td><td>過濾/修改 prompt</td></tr>
+    <tr><td><code>PreToolUse</code></td><td>工具呼叫前</td><td>✅ 是 (exit 2)</td><td>安全防護</td></tr>
+    <tr><td><code>PostToolUse</code></td><td>工具呼叫後</td><td>否</td><td>格式化、狀態追蹤</td></tr>
+    <tr><td><code>Stop</code></td><td>Claude 停止回應</td><td>✅ 是 (exit 2)</td><td>品質閘門</td></tr>
+    <tr><td><code>SubagentStop</code></td><td>子代理完成</td><td>✅ 是</td><td>驗證子代理結果</td></tr>
+    <tr><td><code>TaskCompleted</code></td><td>任務標記完成</td><td>✅ 是</td><td>完成度驗證</td></tr>
+  </tbody>
+</table>
+
+<!-- CH2-3 -->
+<h3 id="ch2-3">2.3 資料流：stdin / stdout / exit code</h3>
+
+<p>每個 Hook 都遵循相同的通訊協定，就像 UNIX 管道一樣簡單：</p>
+
+<div class="diagram">
+<pre>
+Claude Code 引擎
+     │
+     │  stdin（JSON 格式）
+     ▼
+┌───────────────────────────────┐
+│       你的 Hook 腳本           │
+│                               │
+│  1. 從 stdin 讀取 JSON        │
+│  2. 解析 tool_name、tool_input │
+│  3. 執行你的邏輯              │
+│  4. 決定：允許 or 拒絕        │
+│                               │
+└───────────────────────────────┘
+     │
+     │  exit code + stdout JSON + stderr 訊息
+     ▼
+Claude Code 引擎
+</pre>
+</div>
+
+<h4>輸入格式（stdin JSON）</h4>
+
+<p>不同事件有不同欄位，但共用基礎結構：</p>
+
+<pre><code><span class="cmt">// PreToolUse 事件的 stdin 範例</span>
+{
+  <span class="str">"session_id"</span>: <span class="str">"sess_abc123"</span>,
+  <span class="str">"transcript_path"</span>: <span class="str">"/tmp/.claude/sessions/abc123.jsonl"</span>,
+  <span class="str">"cwd"</span>: <span class="str">"/home/user/my-project"</span>,
+  <span class="str">"tool_name"</span>: <span class="str">"Edit"</span>,               <span class="cmt">// ← 哪個工具被呼叫</span>
+  <span class="str">"tool_input"</span>: {                        <span class="cmt">// ← 工具的輸入參數</span>
+    <span class="str">"file_path"</span>: <span class="str">"/home/user/my-project/.env"</span>,
+    <span class="str">"old_string"</span>: <span class="str">"API_KEY=xxx"</span>,
+    <span class="str">"new_string"</span>: <span class="str">"API_KEY=yyy"</span>
+  }
+}
+</code></pre>
+
+<h4>輸出：Exit Code 決定一切</h4>
+
+<table>
+  <thead>
+    <tr><th>Exit Code</th><th>意義</th><th>Claude 的反應</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>0</code></td>
+      <td>✅ 允許</td>
+      <td>解析 stdout JSON（如有），繼續執行</td>
+    </tr>
+    <tr>
+      <td><code>2</code></td>
+      <td>🚫 阻斷</td>
+      <td>停止該操作，<strong>stderr 文字</strong>會回饋給 Claude 作為錯誤訊息</td>
+    </tr>
+    <tr>
+      <td>其他</td>
+      <td>⚠️ 軟錯誤</td>
+      <td>繼續執行，stderr 寫入 verbose log</td>
+    </tr>
+  </tbody>
+</table>
+
+<pre><code><span class="cmt"># 範例 A：允許（exit 0）</span>
+<span class="kw">echo</span> <span class="str">'{"ok": true}'</span>
+<span class="kw">exit</span> <span class="num">0</span>
+
+<span class="cmt"># 範例 B：阻斷（exit 2），stderr 回饋給 Claude</span>
+<span class="kw">echo</span> <span class="str">"[Guard] Blocked: editing .env is not allowed"</span> <span class="op">&gt;&amp;2</span>
+<span class="kw">exit</span> <span class="num">2</span>
+
+<span class="cmt"># 範例 C：允許但附帶警告</span>
+<span class="kw">echo</span> <span class="str">'{"systemMessage": "Warning: this file is shared by 3 services"}'</span>
+<span class="kw">exit</span> <span class="num">0</span>
+</code></pre>
+
+<!-- CH2-4 -->
+<h3 id="ch2-4">2.4 hooks.json 註冊結構</h3>
+
+<p>Hook 可以在四個位置註冊（優先順序高→低）：</p>
+
+<table>
+  <thead>
+    <tr><th>位置</th><th>範圍</th><th>適用場景</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>~/.claude/settings.json</code></td><td>全域使用者</td><td>個人通用 hooks</td></tr>
+    <tr><td><code>.claude/settings.json</code></td><td>專案共享</td><td>團隊共用 hooks（進 git）</td></tr>
+    <tr><td><code>.claude/settings.local.json</code></td><td>專案私有</td><td>個人專案 hooks（不進 git）</td></tr>
+    <tr><td>Plugin <code>hooks/hooks.json</code></td><td>外掛附帶</td><td>外掛自帶 hooks</td></tr>
+  </tbody>
+</table>
+
+<h4>hooks.json 三層結構</h4>
+
+<pre><code>{
+  <span class="str">"hooks"</span>: {
+    <span class="str">"&lt;事件名稱&gt;"</span>: [            <span class="cmt">// 第 1 層：事件</span>
+      {
+        <span class="str">"matcher"</span>: <span class="str">"Edit|Write"</span>,  <span class="cmt">// 第 2 層：Regex 過濾工具名稱</span>
+        <span class="str">"hooks"</span>: [                  <span class="cmt">// 第 3 層：Hook handlers</span>
+          {
+            <span class="str">"type"</span>: <span class="str">"command"</span>,       <span class="cmt">// command | http | prompt | agent</span>
+            <span class="str">"command"</span>: <span class="str">"path/to/script.sh"</span>,
+            <span class="str">"timeout"</span>: <span class="num">30</span>            <span class="cmt">// 超時秒數（預設 60）</span>
+          }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
+
+<h4>Matcher 範例</h4>
+
+<table>
+  <thead>
+    <tr><th>Matcher</th><th>匹配對象</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>""</code>（空字串）</td><td>所有工具（萬用）</td></tr>
+    <tr><td><code>"Edit|Write"</code></td><td>Edit 或 Write 工具</td></tr>
+    <tr><td><code>"Bash"</code></td><td>只匹配 Bash 工具</td></tr>
+    <tr><td><code>"mcp__codex__.*"</code></td><td>所有 Codex MCP 工具</td></tr>
+    <tr><td><code>"mcp__.*"</code></td><td>所有 MCP 工具</td></tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- CH2-5 -->
+<h3 id="ch2-5">2.5 實戰：從零寫一個 Hook</h3>
+
+<div class="callout callout-success">
+  <div class="callout-title">🎯 目標</div>
+  <p>寫一個 PreToolUse Hook：禁止 Claude 刪除超過 50 行的程式碼（防止大規模誤刪）</p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">1</div>
+  <div class="step-title">建立腳本檔案</div>
+  <p>在專案根目錄建立 <code>.claude/hooks/delete-guard.sh</code>：</p>
+<pre><code><span class="cmt">#!/usr/bin/env bash</span>
+<span class="cmt"># PreToolUse hook: 防止刪除過多程式碼</span>
+<span class="kw">set</span> -euo pipefail
+
+<span class="cmt"># 從 stdin 讀取 JSON</span>
+<span class="var">INPUT</span>=$(<span class="fn">cat</span>)
+
+<span class="cmt"># 只攔截 Edit 工具</span>
+<span class="var">TOOL_NAME</span>=$(<span class="kw">echo</span> <span class="str">"$INPUT"</span> | jq -r <span class="str">'.tool_name // empty'</span>)
+<span class="kw">if</span> [[ <span class="str">"$TOOL_NAME"</span> != <span class="str">"Edit"</span> ]]; <span class="kw">then</span>
+  <span class="kw">exit</span> <span class="num">0</span>  <span class="cmt"># 不是 Edit，放行</span>
+<span class="kw">fi</span>
+
+<span class="cmt"># 取出 old_string（要被替換的內容）</span>
+<span class="var">OLD_STRING</span>=$(<span class="kw">echo</span> <span class="str">"$INPUT"</span> | jq -r <span class="str">'.tool_input.old_string // empty'</span>)
+<span class="var">NEW_STRING</span>=$(<span class="kw">echo</span> <span class="str">"$INPUT"</span> | jq -r <span class="str">'.tool_input.new_string // empty'</span>)
+
+<span class="cmt"># 計算行數差異</span>
+<span class="var">OLD_LINES</span>=$(<span class="kw">echo</span> <span class="str">"$OLD_STRING"</span> | wc -l)
+<span class="var">NEW_LINES</span>=$(<span class="kw">echo</span> <span class="str">"$NEW_STRING"</span> | wc -l)
+<span class="var">DELETED</span>=$(( OLD_LINES - NEW_LINES ))
+
+<span class="cmt"># 刪除超過 50 行？阻斷！</span>
+<span class="kw">if</span> (( DELETED > <span class="num">50</span> )); <span class="kw">then</span>
+  <span class="kw">echo</span> <span class="str">"[Delete Guard] 阻斷：嘗試刪除 ${DELETED} 行（上限 50）"</span> <span class="op">&gt;&amp;2</span>
+  <span class="kw">exit</span> <span class="num">2</span>  <span class="cmt"># 阻斷！</span>
+<span class="kw">fi</span>
+
+<span class="kw">exit</span> <span class="num">0</span>  <span class="cmt"># 放行</span>
+</code></pre>
+</div>
+
+<div class="step-box">
+  <div class="step-num">2</div>
+  <div class="step-title">賦予執行權限</div>
+<pre><code>chmod +x .claude/hooks/delete-guard.sh</code></pre>
+</div>
+
+<div class="step-box">
+  <div class="step-num">3</div>
+  <div class="step-title">註冊到 settings.json</div>
+  <p>編輯 <code>.claude/settings.json</code>（或 <code>settings.local.json</code>）：</p>
+<pre><code>{
+  <span class="str">"hooks"</span>: {
+    <span class="str">"PreToolUse"</span>: [
+      {
+        <span class="str">"matcher"</span>: <span class="str">"Edit"</span>,
+        <span class="str">"hooks"</span>: [
+          {
+            <span class="str">"type"</span>: <span class="str">"command"</span>,
+            <span class="str">"command"</span>: <span class="str">".claude/hooks/delete-guard.sh"</span>
+          }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
+</div>
+
+<div class="step-box">
+  <div class="step-num">4</div>
+  <div class="step-title">測試</div>
+  <p>重啟 Claude Code，嘗試讓 Claude 刪除大段程式碼，你會看到：</p>
+<pre><code>[Delete Guard] 阻斷：嘗試刪除 87 行（上限 50）</code></pre>
+  <p>Claude 會收到這個錯誤訊息，並改用更小範圍的修改策略。</p>
+</div>
+
+<div class="callout callout-warn">
+  <div class="callout-title">⚠️ 前置需求</div>
+  <p>所有 command 類型 Hook 都需要系統安裝 <code>jq</code>（JSON 處理工具）。<br>
+  安裝方式：<code>brew install jq</code>（macOS）/ <code>apt install jq</code>（Linux）/ <code>choco install jq</code>（Windows）</p>
+</div>
+
+<!-- CH2-6 -->
+<h3 id="ch2-6">2.6 本專案的 5 個 Hooks 詳解</h3>
+
+<table>
+  <thead>
+    <tr><th>Hook</th><th>事件</th><th>Matcher</th><th>功能</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>namespace-hint</strong></td>
+      <td><code>SessionStart</code></td>
+      <td><code>""</code></td>
+      <td>告訴 Claude 所有指令要加 <code>/sd0x-dev-flow:</code> 前綴</td>
+    </tr>
+    <tr>
+      <td><strong>pre-edit-guard</strong></td>
+      <td><code>PreToolUse</code></td>
+      <td><code>Edit|Write</code></td>
+      <td>阻擋 <code>.env</code>、<code>.git/</code>、shell 注入路徑</td>
+    </tr>
+    <tr>
+      <td><strong>post-edit-format</strong></td>
+      <td><code>PostToolUse</code></td>
+      <td><code>Edit|Write</code></td>
+      <td>自動 prettier + 更新 review state（失效 review）</td>
+    </tr>
+    <tr>
+      <td><strong>post-tool-review-state</strong></td>
+      <td><code>PostToolUse</code></td>
+      <td><code>Bash|mcp__codex__*</code></td>
+      <td>解析 review/precommit sentinel，更新狀態檔</td>
+    </tr>
+    <tr>
+      <td><strong>stop-guard</strong></td>
+      <td><code>Stop</code></td>
+      <td><code>""</code></td>
+      <td>檢查品質關卡是否通過，未通過則警告/阻止</td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>狀態檔：<code>.claude_review_state.json</code></h4>
+
+<p>這是 Hooks 之間共享的「記憶體」，記錄當前 session 的品質狀態：</p>
+
+<pre><code>{
+  <span class="str">"has_code_change"</span>: <span class="kw">true</span>,       <span class="cmt">// ← post-edit-format 設定</span>
+  <span class="str">"has_doc_change"</span>: <span class="kw">false</span>,
+  <span class="str">"code_review"</span>: {
+    <span class="str">"executed"</span>: <span class="kw">true</span>,              <span class="cmt">// ← 是否執行過</span>
+    <span class="str">"passed"</span>: <span class="kw">true</span>,                <span class="cmt">// ← 是否通過</span>
+    <span class="str">"last_run"</span>: <span class="str">"2026-03-05T10:00:00Z"</span>
+  },
+  <span class="str">"doc_review"</span>:  { <span class="str">"executed"</span>: <span class="kw">false</span>, <span class="str">"passed"</span>: <span class="kw">false</span> },
+  <span class="str">"precommit"</span>:   { <span class="str">"executed"</span>: <span class="kw">true</span>,  <span class="str">"passed"</span>: <span class="kw">true</span> }
+}
+</code></pre>
+
+<div class="callout callout-info">
+  <div class="callout-title">💡 關鍵設計</div>
+  <p><strong>每次編輯都會「失效」review</strong>：post-edit-format 在偵測到程式碼修改時，會把 <code>code_review.passed</code> 和 <code>precommit.passed</code> 重設為 <code>false</code>。這確保即使上一輪 review 通過了，新的修改也必須重新審查。</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ==================== CH3 ==================== -->
+<h2 id="ch3">3. Claude Code 作為 MCP</h2>
+
+<!-- CH3-1 -->
+<h3 id="ch3-1">3.1 MCP 協定基礎</h3>
+
+<p><strong>MCP</strong>（Model Context Protocol）是 Anthropic 推出的開放標準，定義 AI 模型與外部工具的結構化通訊。</p>
+
+<div class="diagram">
+<pre>
+┌───────────────┐      JSON-RPC 2.0       ┌───────────────┐
+│   MCP Client   │  ◄──────────────────►  │   MCP Server   │
+│  （AI 模型）    │   over stdio or HTTP    │  （工具提供者） │
+└───────────────┘                          └───────────────┘
+</pre>
+</div>
+
+<p>MCP Server 提供三種能力：</p>
+
+<table>
+  <thead>
+    <tr><th>能力</th><th>描述</th><th>範例</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Tools</strong></td><td>可呼叫的函式</td><td><code>read_file</code>、<code>search_code</code>、<code>run_test</code></td></tr>
+    <tr><td><strong>Resources</strong></td><td>可讀取的資料</td><td>DB schema、API 文件</td></tr>
+    <tr><td><strong>Prompts</strong></td><td>可重用的 prompt 範本</td><td>Code review 範本</td></tr>
+  </tbody>
+</table>
+
+<!-- CH3-2 -->
+<h3 id="ch3-2">3.2 Claude Code 作為 MCP Client（日常使用）</h3>
+
+<p>這是最常見的模式。Claude Code 連接外部 MCP Server 來擴展能力：</p>
+
+<div class="diagram">
+<pre>
+┌──────────────────────────────────────────────────┐
+│              Claude Code (MCP Client)              │
+│                                                    │
+│  內建工具：Read, Edit, Bash, Grep, Glob, Write     │
+│                                                    │
+│  ┌──── MCP 連線 ──────────────────────────────┐  │
+│  │                                              │  │
+│  │  mcp__codex__codex      →  Codex CLI Server  │  │
+│  │  mcp__github__*         →  GitHub Server      │  │
+│  │  mcp__pinecone__*       →  Pinecone Server    │  │
+│  │  mcp__memory__*         →  Memory Server      │  │
+│  │                                              │  │
+│  └──────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────┘
+</pre>
+</div>
+
+<p>本專案的 <code>/codex-review-fast</code> 就是透過 MCP 呼叫 Codex：</p>
+
+<pre><code><span class="cmt">// Claude 呼叫 Codex MCP 進行 code review</span>
+<span class="fn">mcp__codex__codex</span>({
+  <span class="str">prompt</span>: <span class="str">`You are a senior Code Reviewer...
+## Git Diff
+\`\`\`diff
+${GIT_DIFF}
+\`\`\`
+## ⚠️ You must independently research the project ⚠️
+...`</span>,
+  <span class="str">sandbox</span>: <span class="str">'read-only'</span>,        <span class="cmt">// Codex 只能讀，不能改</span>
+  <span class="str">'approval-policy'</span>: <span class="str">'never'</span>,  <span class="cmt">// 不需要人工核准</span>
+});
+<span class="cmt">// 回傳: { threadId: "abc123", content: "## Findings\n..." }</span>
+</code></pre>
+
+<!-- CH3-3 -->
+<h3 id="ch3-3">3.3 Claude Code 作為 MCP Server（進階用法）</h3>
+
+<div class="callout callout-success">
+  <div class="callout-title">🎯 使用場景</div>
+  <p>讓其他 AI 工具（Claude Desktop、Cursor、Windsurf）能遠端呼叫 Claude Code 的開發工具。</p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">1</div>
+  <div class="step-title">啟動 Claude Code 為 MCP Server</div>
+<pre><code><span class="cmt"># 一行指令</span>
+claude mcp serve</code></pre>
+  <p>Claude Code 現在以 stdio 模式監聽，等待 MCP Client 連接。</p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">2</div>
+  <div class="step-title">在 Claude Desktop 中設定連線</div>
+  <p>編輯 Claude Desktop 的 MCP 設定（通常在 <code>~/.claude/claude_desktop_config.json</code>）：</p>
+<pre><code>{
+  <span class="str">"mcpServers"</span>: {
+    <span class="str">"claude-code"</span>: {
+      <span class="str">"type"</span>: <span class="str">"stdio"</span>,
+      <span class="str">"command"</span>: <span class="str">"claude"</span>,
+      <span class="str">"args"</span>: [<span class="str">"mcp"</span>, <span class="str">"serve"</span>]
+    }
+  }
+}
+</code></pre>
+</div>
+
+<div class="step-box">
+  <div class="step-num">3</div>
+  <div class="step-title">在 Cursor / Windsurf 中設定</div>
+  <p>在 IDE 的 MCP 設定中加入相同配置：</p>
+<pre><code>{
+  <span class="str">"mcpServers"</span>: {
+    <span class="str">"claude-code"</span>: {
+      <span class="str">"command"</span>: <span class="str">"claude"</span>,
+      <span class="str">"args"</span>: [<span class="str">"mcp"</span>, <span class="str">"serve"</span>],
+      <span class="str">"env"</span>: { <span class="str">"CLAUDE_MODEL"</span>: <span class="str">"opus"</span> }
+    }
+  }
+}
+</code></pre>
+</div>
+
+<div class="step-box">
+  <div class="step-num">4</div>
+  <div class="step-title">使用暴露的工具</div>
+  <p>連線後，其他 MCP Client 可呼叫 Claude Code 的所有工具：</p>
+  <table>
+    <thead><tr><th>暴露的工具</th><th>功能</th></tr></thead>
+    <tbody>
+      <tr><td><code>Read</code></td><td>讀取任意檔案</td></tr>
+      <tr><td><code>Edit</code></td><td>精確替換檔案內容</td></tr>
+      <tr><td><code>Write</code></td><td>建立或覆寫檔案</td></tr>
+      <tr><td><code>Grep</code></td><td>搜尋檔案內容（基於 ripgrep）</td></tr>
+      <tr><td><code>Glob</code></td><td>搜尋檔案路徑（模式匹配）</td></tr>
+      <tr><td><code>Bash</code></td><td>執行 shell 命令</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- CH3-4 -->
+<h3 id="ch3-4">3.4 Hooks vs MCP 比較</h3>
+
+<table>
+  <thead>
+    <tr><th>面向</th><th>MCP</th><th>Hooks</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>方向</strong></td><td>Outside-in（外部引入能力）</td><td>Inside-out（內部控制行為）</td></tr>
+    <tr><td><strong>觸發者</strong></td><td>Claude 主動請求</td><td>系統自動觸發</td></tr>
+    <tr><td><strong>能否阻斷？</strong></td><td>否（只能回傳錯誤）</td><td><strong>是</strong>（exit 2 拒絕）</td></tr>
+    <tr><td><strong>通訊協定</strong></td><td>JSON-RPC 2.0 over stdio/HTTP</td><td>stdin JSON + exit code</td></tr>
+    <tr><td><strong>狀態</strong></td><td>無狀態（每次獨立請求）</td><td>可持久狀態（.json 檔案）</td></tr>
+    <tr><td><strong>典型用途</strong></td><td>連接 GitHub、DB、Codex</td><td>格式化、品質閘門、安全防護</td></tr>
+    <tr><td><strong>一句話</strong></td><td>擴展「能做什麼」</td><td>控制「該怎麼做」</td></tr>
+  </tbody>
+</table>
+
+<div class="callout callout-info">
+  <div class="callout-title">💡 交叉點</div>
+  <p>本專案的 <code>post-tool-review-state.sh</code> 同時監控 <code>Bash</code> 和 <code>mcp__codex__codex</code> 工具——這是 <strong>Hook 監控 MCP 行為</strong> 的具體實例。Hook 可以攔截任何 MCP 工具的輸出，解析其結果來更新內部狀態。</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ==================== CH4 ==================== -->
+<h2 id="ch4">4. Auto-Loop 控制流深度解析</h2>
+
+<!-- CH4-1 -->
+<h3 id="ch4-1">4.1 雙層防禦架構</h3>
+
+<p>Auto-Loop 的可靠性來自「不信任單一層」的防禦思維：</p>
+
+<div class="diagram">
+<pre>
+┌─────────────────────────────────────────────────────┐
+│  第一層：行為層（Rules + CLAUDE.md）                  │
+│                                                      │
+│  rules/auto-loop.md 告訴 Claude：                    │
+│  「編輯後必須在同一回覆中跑 review」                  │
+│                                                      │
+│  ✅ 優點：Claude 會主動執行                          │
+│  ❌ 弱點：Claude 可能忘記、被截斷、被其他指令覆蓋    │
+├─────────────────────────────────────────────────────┤
+│  第二層：系統層（Hooks）                              │
+│                                                      │
+│  hooks/stop-guard.sh 在 Claude 停止時檢查：          │
+│  「review + precommit 是否都通過了？」                │
+│                                                      │
+│  ✅ 優點：系統強制執行，不依賴 AI 的記憶力            │
+│  ❌ 弱點：只能在 Stop 時攔截，不能主動觸發 review    │
+└─────────────────────────────────────────────────────┘
+
+                    兩層合在一起 =
+     行為層讓 Claude 「想做」+ 系統層讓 Claude 「必須做」
+</pre>
+</div>
+
+<!-- CH4-2 -->
+<h3 id="ch4-2">4.2 完整資料流追蹤（逐步）</h3>
+
+<p>以一次典型的程式碼修改為例，追蹤每個步驟的資料流向：</p>
+
+<h4>Step 1：Claude 編輯程式碼</h4>
+<div class="step-box">
+  <div class="step-num">1</div>
+  <div class="step-title">PreToolUse → pre-edit-guard.sh</div>
+  <p>Claude 要 Edit <code>src/app.ts</code> → hook 收到 stdin JSON → 檢查路徑安全 → <code>exit 0</code>（放行）</p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">2</div>
+  <div class="step-title">PostToolUse → post-edit-format.sh</div>
+  <p>Edit 執行完成，hook 自動觸發：</p>
+  <ol>
+    <li>偵測到 <code>.ts</code> 副檔名 → 執行 <code>npx prettier --write src/app.ts</code></li>
+    <li>更新狀態檔：<code>has_code_change = true</code></li>
+    <li>失效 review：<code>code_review.passed = false</code>、<code>precommit.passed = false</code></li>
+  </ol>
+
+<pre><code><span class="cmt"># post-edit-format.sh 的關鍵邏輯</span>
+<span class="kw">if</span> <span class="kw">echo</span> <span class="str">"$file_path"</span> | grep -Eq <span class="str">'\.(ts|tsx|js|jsx|...)$'</span>; <span class="kw">then</span>
+  update_change_flag <span class="str">"has_code_change"</span>     <span class="cmt"># → true</span>
+  invalidate_review <span class="str">"code_review"</span>          <span class="cmt"># → passed = false</span>
+  invalidate_review <span class="str">"precommit"</span>            <span class="cmt"># → passed = false</span>
+<span class="kw">fi</span>
+</code></pre>
+</div>
+
+<h4>Step 2：Claude 自動跑 review（行為層觸發）</h4>
+<div class="step-box">
+  <div class="step-num">3</div>
+  <div class="step-title">Claude 執行 /codex-review-fast</div>
+  <p>行為層（auto-loop.md）告訴 Claude 必須在同一回覆中跑 review：</p>
+  <ol>
+    <li>Claude 執行 <code>git diff HEAD</code> 收集變更</li>
+    <li>Claude 呼叫 <code>mcp__codex__codex</code> 送出 diff 給 Codex</li>
+    <li>Codex 獨立研究專案，回覆 findings + gate</li>
+  </ol>
+</div>
+
+<div class="step-box">
+  <div class="step-num">4</div>
+  <div class="step-title">PostToolUse → post-tool-review-state.sh</div>
+  <p>Hook 攔截 Codex MCP 的回覆，解析 sentinel：</p>
+
+<pre><code><span class="cmt"># 假設 Codex 回覆包含 "⛔ Blocked"</span>
+<span class="kw">if</span> <span class="kw">echo</span> <span class="str">"$TOOL_OUTPUT"</span> | grep -qE <span class="str">'⛔ Blocked'</span>; <span class="kw">then</span>
+  update_state <span class="str">"code_review"</span> <span class="str">"true"</span> <span class="str">"false"</span>
+  <span class="cmt"># → code_review = { executed: true, passed: false }</span>
+<span class="kw">fi</span>
+</code></pre>
+</div>
+
+<h4>Step 3：修正 → 重新 review → 通過</h4>
+<div class="step-box">
+  <div class="step-num">5</div>
+  <div class="step-title">Claude 修正問題 → 再次觸發 edit hook → 再次失效 review</div>
+  <p>Edit 觸發 post-edit-format → <code>code_review.passed = false</code>（再次失效）</p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">6</div>
+  <div class="step-title">Claude 執行 /codex-review-fast --continue &lt;threadId&gt;</div>
+  <p>這次 Codex 回覆 <code>✅ Ready</code> → hook 更新 <code>code_review.passed = true</code></p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">7</div>
+  <div class="step-title">Claude 執行 /precommit</div>
+  <p>precommit-runner.js 執行 lint:fix → build → test:unit<br>
+  全部通過 → 輸出 <code>## Overall: ✅ PASS</code> → hook 更新 <code>precommit.passed = true</code></p>
+</div>
+
+<h4>Step 4：Stop Guard 放行</h4>
+<div class="step-box">
+  <div class="step-num">8</div>
+  <div class="step-title">Claude 停止回應 → Stop → stop-guard.sh</div>
+  <p>讀取狀態檔：</p>
+<pre><code>{
+  <span class="str">"has_code_change"</span>: <span class="kw">true</span>,
+  <span class="str">"code_review"</span>:  { <span class="str">"passed"</span>: <span class="kw">true</span>  },  <span class="cmt">← ✅</span>
+  <span class="str">"precommit"</span>:    { <span class="str">"passed"</span>: <span class="kw">true</span>  }   <span class="cmt">← ✅</span>
+}
+<span class="cmt">→ 所有關卡通過 → exit 0 → 允許停止</span>
+</code></pre>
+</div>
+
+<!-- CH4-3 -->
+<h3 id="ch4-3">4.3 Sentinel 標準與解析</h3>
+
+<p>Review 指令和 precommit 必須輸出標準化的「哨兵字串」，hook 用它判斷通過/失敗：</p>
+
+<table>
+  <thead>
+    <tr><th>Sentinel</th><th>意義</th><th>產生者</th><th>消費者</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>✅ Ready</code></td><td>Code review 通過</td><td>/codex-review-fast</td><td>post-tool-review-state</td></tr>
+    <tr><td><code>⛔ Blocked</code></td><td>Code review 失敗</td><td>/codex-review-fast</td><td>post-tool-review-state</td></tr>
+    <tr><td><code>✅ Mergeable</code></td><td>Doc review 通過</td><td>/codex-review-doc</td><td>post-tool-review-state</td></tr>
+    <tr><td><code>⛔ Needs revision</code></td><td>Doc review 失敗</td><td>/codex-review-doc</td><td>post-tool-review-state</td></tr>
+    <tr><td><code>## Overall: ✅ PASS</code></td><td>Precommit 通過</td><td>/precommit</td><td>post-tool-review-state</td></tr>
+    <tr><td><code>## Overall: ❌ FAIL</code></td><td>Precommit 失敗</td><td>/precommit</td><td>post-tool-review-state</td></tr>
+    <tr><td><code>✅ All Pass</code></td><td>所有檢查通過</td><td>通用</td><td>stop-guard (fallback)</td></tr>
+    <tr><td><code>⚠️ Need Human</code></td><td>需要人工介入</td><td>Doc Sync</td><td>行為層 only</td></tr>
+  </tbody>
+</table>
+
+<div class="callout callout-warn">
+  <div class="callout-title">⚠️ 重要：Sentinel 的解析規則</div>
+  <p><code>post-tool-review-state.sh</code> 使用<strong>優先順序</strong>解析：</p>
+  <ol>
+    <li>先看是否有 <code>## Document Review</code> 區段標題 → doc review</li>
+    <li>再看 <code>✅ Ready</code> / <code>⛔ Blocked</code> → code review</li>
+    <li>再看 <code>## Overall:</code> → precommit</li>
+    <li>最後 <code>✅ All Pass</code> → 通用 fallback</li>
+  </ol>
+  <p>這避免了 code review sentinel 被誤認為 doc review sentinel。</p>
+</div>
+
+<!-- CH4-4 -->
+<h3 id="ch4-4">4.4 失敗路徑與安全閥</h3>
+
+<h4>場景 A：Claude 忘記跑 review 就想停</h4>
+
+<div class="diagram">
+<pre>
+Claude: [Edit 完成]
+        ↓
+        「修改完成了。」
+        ↓
+        [嘗試停止]
+        ↓
+Stop → stop-guard.sh
+        ↓
+        讀取 .claude_review_state.json
+        has_code_change = true
+        code_review.passed = false  ← ❌
+        precommit.passed = false    ← ❌
+        ↓
+        MISSING = "/codex-review-fast /precommit"
+        ↓
+  ┌─── warn 模式（預設）───────────────────────────┐
+  │ stderr: "WARN: Missing steps..."                │
+  │ exit 0 → 允許停止，使用者看到警告               │
+  └────────────────────────────────────────────────┘
+  ┌─── strict 模式 ───────────────────────────────┐
+  │ stderr: "STRICT: Missing steps..."              │
+  │ exit 2 → 阻止停止！Claude 被迫繼續跑 review   │
+  └────────────────────────────────────────────────┘
+</pre>
+</div>
+
+<h4>場景 B：Review 失敗，修了 3 次仍不過</h4>
+
+<p>行為層有 <strong>3 round 限制</strong>：</p>
+
+<pre><code><span class="cmt"># auto-loop.md 定義的退出條件</span>
+Round 1: Review ⛔ → Fix → Re-review ⛔
+Round 2: Fix → Re-review ⛔
+Round 3: Fix → Re-review ⛔
+         ↓
+         🔄 同一問題 3 rounds → 回報 blocker，請求人工介入
+</code></pre>
+
+<h4>場景 C：Stale-State 修復</h4>
+
+<p>如果使用者在 Claude 之外做了 <code>git commit</code>，state file 的 <code>has_code_change</code> 仍為 <code>true</code>。Stop Guard 會用 <code>git status</code> 做反向校正：</p>
+
+<pre><code><span class="cmt"># stop-guard.sh 的 stale-state 邏輯</span>
+GIT_PORCELAIN=$(git status --porcelain -uno)
+
+<span class="cmt"># 如果 state 說有程式碼變更，但 git 沒有 .ts/.js 等檔案</span>
+<span class="kw">if</span> [[ <span class="str">"$HAS_CODE_CHANGE"</span> == <span class="str">"true"</span> ]]; <span class="kw">then</span>
+  <span class="kw">if</span> ! <span class="kw">echo</span> <span class="str">"$GIT_PORCELAIN"</span> | grep -qE <span class="str">'\.(ts|tsx|js|jsx|...)$'</span>; <span class="kw">then</span>
+    HAS_CODE_CHANGE=<span class="str">"false"</span>  <span class="cmt"># 覆寫：已 commit 或 revert</span>
+  <span class="kw">fi</span>
+<span class="kw">fi</span>
+
+<span class="cmt"># ⚠️ 注意：只做 true→false，不做 false→true</span>
+<span class="cmt"># 因為外部 untracked 檔案不應該觸發 review</span>
+</code></pre>
+
+<h4>退出條件總覽</h4>
+
+<table>
+  <thead>
+    <tr><th>退出條件</th><th>觸發情況</th><th>行為</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>✅ All Pass</td><td>code_review + precommit 都通過</td><td>正常結束</td></tr>
+    <tr><td>⛔ Need Human</td><td>架構變更、功能移除、使用者要求停止</td><td>回報並等待</td></tr>
+    <tr><td>⚠️ Need Human</td><td>Doc Sync 找不到目標文件</td><td>回報並等待</td></tr>
+    <tr><td>🔄 3 rounds</td><td>同一問題修 3 次仍失敗</td><td>回報為 blocker</td></tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== CH5 ==================== -->
+<h2 id="ch5">5. 動手做：新手實作練習</h2>
+
+<div class="callout callout-success">
+  <div class="callout-title">🎯 練習目標</div>
+  <p>完成以下 3 個練習，你就能掌握 Hook、MCP、Auto-Loop 的核心概念。</p>
+</div>
+
+<h3>練習 1：寫一個 SessionStart Hook</h3>
+
+<p><strong>目標</strong>：在每次 Claude Code session 開始時，輸出今天的日期和專案名稱。</p>
+
+<div class="step-box">
+  <div class="step-num">1</div>
+  <div class="step-title">建立腳本</div>
+<pre><code><span class="cmt">#!/usr/bin/env bash</span>
+<span class="cmt"># .claude/hooks/session-greeting.sh</span>
+<span class="kw">echo</span> <span class="str">"📅 $(date +%Y-%m-%d) | 專案：$(basename $(pwd))"</span>
+<span class="kw">echo</span> <span class="str">"⏰ 目前時間：$(date +%H:%M)"</span>
+</code></pre>
+</div>
+
+<div class="step-box">
+  <div class="step-num">2</div>
+  <div class="step-title">註冊到 .claude/settings.local.json</div>
+<pre><code>{
+  <span class="str">"hooks"</span>: {
+    <span class="str">"SessionStart"</span>: [
+      {
+        <span class="str">"matcher"</span>: <span class="str">""</span>,
+        <span class="str">"hooks"</span>: [{ <span class="str">"type"</span>: <span class="str">"command"</span>, <span class="str">"command"</span>: <span class="str">".claude/hooks/session-greeting.sh"</span> }]
+      }
+    ]
+  }
+}
+</code></pre>
+</div>
+
+<div class="step-box">
+  <div class="step-num">3</div>
+  <div class="step-title">測試：重啟 Claude Code，應該看到日期和專案名</div>
+</div>
+
+<hr>
+
+<h3>練習 2：觀察 Auto-Loop 運作</h3>
+
+<p><strong>目標</strong>：觀察編輯後 review state 如何變化。</p>
+
+<div class="step-box">
+  <div class="step-num">1</div>
+  <div class="step-title">確認已安裝 sd0x-dev-flow plugin</div>
+</div>
+
+<div class="step-box">
+  <div class="step-num">2</div>
+  <div class="step-title">讓 Claude 編輯任意 .ts 或 .js 檔案</div>
+</div>
+
+<div class="step-box">
+  <div class="step-num">3</div>
+  <div class="step-title">檢查狀態檔</div>
+<pre><code>cat .claude_review_state.json | jq .</code></pre>
+  <p>你應該看到 <code>has_code_change: true</code> 且 <code>code_review.passed: false</code></p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">4</div>
+  <div class="step-title">觀察 Claude 是否自動跑 /codex-review-fast</div>
+  <p>如果行為層正常運作，Claude 會在同一回覆中自動觸發 review。</p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">5</div>
+  <div class="step-title">Review 完成後再檢查狀態檔</div>
+<pre><code>cat .claude_review_state.json | jq .</code></pre>
+  <p>看 <code>code_review.passed</code> 是否變為 <code>true</code>。</p>
+</div>
+
+<hr>
+
+<h3>練習 3：體驗 Claude Code 作為 MCP Server</h3>
+
+<p><strong>目標</strong>：啟動 Claude Code 為 MCP Server 並理解其暴露的工具。</p>
+
+<div class="step-box">
+  <div class="step-num">1</div>
+  <div class="step-title">在終端機執行</div>
+<pre><code>claude mcp serve</code></pre>
+  <p>你會看到 Claude Code 進入等待模式，準備接收 MCP 請求。</p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">2</div>
+  <div class="step-title">如果有 Claude Desktop</div>
+  <p>在 MCP 設定中加入連線（參考 3.3 節），然後嘗試讓 Claude Desktop 讀取本地檔案。</p>
+</div>
+
+<div class="step-box">
+  <div class="step-num">3</div>
+  <div class="step-title">思考問題</div>
+  <ul>
+    <li>當 Claude Desktop 透過 MCP 呼叫 Claude Code 的 Edit 工具時，Pre-edit-guard hook 會觸發嗎？</li>
+    <li>（答案：是的！Hook 會攔截所有工具呼叫，不論來源。）</li>
+  </ul>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ==================== CH6 ==================== -->
+<h2 id="ch6">6. 常見問題 FAQ</h2>
+
+<h4>Q1：Hook 和 Git Hook 有什麼不同？</h4>
+<p><strong>Git Hook</strong> 只在 git 操作（commit、push）時觸發。<strong>Claude Code Hook</strong> 在 AI agent 的整個生命週期觸發——包括讀檔、編輯、搜尋、停止等所有動作。</p>
+
+<h4>Q2：Hook 失敗會不會讓 Claude Code 掛掉？</h4>
+<p>不會。非 0 非 2 的 exit code 只會記錄到 verbose log，Claude Code 繼續運作。只有 exit 2 會阻斷操作。</p>
+
+<h4>Q3：多個 Hook 的執行順序？</h4>
+<p>同一事件的多個 Hook 按定義順序依序執行。任何一個 exit 2 就會阻斷，不會繼續執行後續 Hook。</p>
+
+<h4>Q4：我可以用 Python/Node.js 寫 Hook 嗎？</h4>
+<p>可以！<code>"command": "python3 .claude/hooks/my-hook.py"</code> 或 <code>"command": "node .claude/hooks/my-hook.js"</code>。只要能讀 stdin、寫 stdout、設 exit code 就行。</p>
+
+<h4>Q5：strict 模式和 warn 模式的差別？</h4>
+<p><strong>warn</strong>（預設）：Stop Guard 發現缺步驟時顯示警告，但允許停止。<br>
+<strong>strict</strong>：發現缺步驟時 exit 2 阻止停止，Claude 被迫繼續執行。<br>
+設定方式：<code>STOP_GUARD_MODE=strict</code></p>
+
+<h4>Q6：Codex MCP 一定要安裝嗎？</h4>
+<p>不是必要的。Codex MCP 是「選用」的外部 reviewer。沒有 Codex，<code>/codex-review-fast</code> 等指令無法使用，但其他功能正常。</p>
+
+<h4>Q7：如果我不想用 Auto-Loop，可以關掉嗎？</h4>
+<p>可以。設定 <code>HOOK_BYPASS=1</code> 環境變數會跳過所有 Stop Guard 檢查。或者移除 <code>rules/auto-loop.md</code> 來停用行為層規則。</p>
+
+<h4>Q8：如何除錯 Hook？</h4>
+<p>設定 <code>HOOK_DEBUG=1</code> 環境變數，Hook 會在 stderr 輸出詳細的 debug 資訊。你也可以直接手動測試：</p>
+
+<pre><code><span class="cmt"># 手動測試 hook（模擬 stdin）</span>
+<span class="kw">echo</span> <span class="str">'{"tool_name":"Edit","tool_input":{"file_path":".env"}}'</span> \
+  | bash .claude/hooks/pre-edit-guard.sh
+<span class="kw">echo</span> <span class="str">"Exit code: $?"</span>
+</code></pre>
+
+<!-- ==================== FOOTER ==================== -->
+<div class="footer">
+  <p>
+    <strong>Claude Code Hooks & MCP 完全指南</strong><br>
+    sd0x-dev-flow v1.8.8<br>
+    本文件可用瀏覽器開啟後 <code>Ctrl+P</code>（或 <code>⌘+P</code>）→ 儲存為 PDF
+  </p>
+</div>
+
+</body>
+</html>
