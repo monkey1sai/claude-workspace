@@ -1,0 +1,19 @@
+{
+  "ServiceSettings": {
+    "SiteURL": "http://localhost:8065",
+    "AllowedUntrustedInternalConnections": "host.docker.internal 172.0.0.0/8 192.168.0.0/16 10.0.0.0/8",
+    "EnableOutgoingWebhooks": true,
+    "EnableInsecureOutgoingConnections": false,
+    "EnableBotAccountCreation": true
+  },
+  "LocalizationSettings": {
+    "AvailableLocales": "zh-TW",
+    "DefaultClientLocale": "zh-TW",
+    "DefaultServerLocale": "zh-TW",
+    "EnableExperimentalLocales": true
+  },
+  "TeamSettings": {
+    "EnableOpenServer": true,
+    "MaxUsersPerTeam": 50
+  }
+}
