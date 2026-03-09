@@ -1,0 +1,264 @@
+{
+  "name": "Mattermost AI Assistant v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mattermost-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7928fe47-7a9f-4cc8-988e-6110938d24f2",
+      "name": "Mattermost Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "c21b0d84-1f0e-48c2-b811-6ce96084343c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 提取 Mattermost Outgoing Webhook 的訊息內容\nconst body = $input.first().json.body;\nconst text = body.text || '';\nconst query = text.replace(/@ai-assistant/gi, '').trim();\nconst channelId = body.channel_id;\nconst userName = body.user_name || 'user';\nconst userId = body.user_id || 'unknown';\nreturn [{json: {query: query || 'hello', channelId, userName, userId}}];"
+      },
+      "id": "7f2edfb5-0d2d-4bdd-b0e2-172562a84de4",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 每人每日額度限制（使用 workflow static data 持久化）\nconst staticData = $getWorkflowStaticData('global');\nconst userId = $json.userId;\nconst today = new Date().toISOString().split('T')[0];\nconst DAILY_LIMIT = 50;\n\n// 初始化 rate 資料結構\nif (!staticData.rate) staticData.rate = {};\nconst key = userId;\n\n// 日期變更時重置計數\nif (!staticData.rate[key] || staticData.rate[key].date !== today) {\n  staticData.rate[key] = { date: today, count: 0 };\n}\n\nconst currentCount = staticData.rate[key].count;\nconst isAllowed = currentCount < DAILY_LIMIT;\n\nif (isAllowed) {\n  staticData.rate[key].count = currentCount + 1;\n}\n\nreturn [{json: {\n  ...$json,\n  rateAllowed: isAllowed,\n  rateRemaining: Math.max(0, DAILY_LIMIT - currentCount - (isAllowed ? 1 : 0)),\n  rateCount: currentCount + (isAllowed ? 1 : 0),\n  dailyLimit: DAILY_LIMIT\n}}];"
+      },
+      "id": "b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "Rate Limiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "" },
+          "conditions": [
+            {
+              "id": "rate-check",
+              "leftValue": "={{ $json.rateAllowed }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c2b3a4d5-f6e7-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "IF Rate OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 簡單意圖路由：關鍵字分類\nconst query = $json.query.toLowerCase();\n\n// 程式碼相關關鍵字（Phase 3 才開放）\nconst codeKeywords = ['review pr', 'write test', 'debug code', 'refactor', 'analyze bug', 'code review', '程式碼審查', '寫測試'];\n// 資料查詢關鍵字（Phase 4 才開放）\nconst dataKeywords = ['query db', 'sql ', 'select from', '查資料庫', '跑報表', '資料庫查詢'];\n\nlet intent = 'general';\n\nfor (const kw of codeKeywords) {\n  if (query.includes(kw)) { intent = 'code'; break; }\n}\nif (intent === 'general') {\n  for (const kw of dataKeywords) {\n    if (query.includes(kw)) { intent = 'data'; break; }\n  }\n}\n\nreturn [{json: { ...$json, intent }}];"
+      },
+      "id": "d3c4b5a6-e7f8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "Intent Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "" },
+          "conditions": [
+            {
+              "id": "intent-check",
+              "leftValue": "={{ $json.intent }}",
+              "rightValue": "general",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "e4d5c6b7-f8a9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "IF General",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1350, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3080/v1/chat-messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer <DIFY_APP_API_KEY>"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ inputs: {}, query: $json.query, response_mode: 'streaming', user: $json.userName }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "a57f3416-bcea-449d-a24f-d5f8804c8352",
+      "name": "Call Dify API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析 Dify SSE 串流回應\nconst raw = $input.first().json.data || $input.first().json.body || '';\nconst text = typeof raw === 'string' ? raw : JSON.stringify(raw);\n\nlet answer = '';\nconst lines = text.split('\\n');\nfor (const line of lines) {\n  if (line.startsWith('data: ')) {\n    try {\n      const data = JSON.parse(line.substring(6));\n      if (data.answer) {\n        answer += data.answer;\n      }\n    } catch (e) {}\n  }\n}\n\nif (!answer) {\n  answer = '\u62b1\u6b49\uff0c\u7121\u6cd5\u8655\u7406\u60a8\u7684\u8acb\u6c42\u3002\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002';\n}\n\nconst channelId = $('Extract Message').first().json.channelId;\nconst userId = $('Extract Message').first().json.userId;\nconst userName = $('Extract Message').first().json.userName;\nconst rateRemaining = $('Rate Limiter').first().json.rateRemaining;\nconst dailyLimit = $('Rate Limiter').first().json.dailyLimit;\nreturn [{json: {answer, channelId, userId, userName, rateRemaining, dailyLimit}}];"
+      },
+      "id": "153d0de6-bbfb-4e51-acd9-2a10da667649",
+      "name": "Parse SSE Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1790, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// \u8a18\u9304\u4f7f\u7528\u7d71\u8a08\u5230 Static Data\nconst staticData = $getWorkflowStaticData('global');\nconst userId = $json.userId;\nconst userName = $json.userName;\n\nif (!staticData.stats) {\n  staticData.stats = { totalRequests: 0, users: {} };\n}\nstaticData.stats.totalRequests++;\n\nif (!staticData.stats.users[userId]) {\n  staticData.stats.users[userId] = { name: userName, total: 0 };\n}\nstaticData.stats.users[userId].total++;\n\n// \u900f\u50b3\u539f\u59cb\u8cc7\u6599\nreturn [$input.first()];"
+      },
+      "id": "f5e6d7c8-a9b0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "Log Usage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2010, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8065/api/v4/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer <MM_BOT_TOKEN>"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $json.channelId, message: $json.answer + '\\n\\n---\\n_\u5269\u9918\u984d\u5ea6\uff1a' + $json.rateRemaining + '/' + $json.dailyLimit + ' | \u56de\u994b \u2192 #ai-feedback_' }) }}",
+        "options": {}
+      },
+      "id": "e49e36fc-07c5-40e9-918f-3e1e17a7d091",
+      "name": "Reply to Mattermost",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8065/api/v4/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer <MM_BOT_TOKEN>"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $('Extract Message').first().json.channelId, message: ':warning: @' + $('Extract Message').first().json.userName + ' \u4eca\u65e5 AI \u984d\u5ea6\u5df2\u7528\u5b8c\uff08' + $json.dailyLimit + '/' + $json.dailyLimit + ' \u6b21\uff09\u3002\u660e\u5929\u518d\u8a66\uff0c\u6216\u81f3 ~ai-feedback \u53cd\u6620\u984d\u5ea6\u9700\u6c42\u3002' }) }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+      "name": "Reply Rate Limited",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8065/api/v4/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer <MM_BOT_TOKEN>"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $('Extract Message').first().json.channelId, message: ':construction: \u6b64\u529f\u80fd\uff08' + ($json.intent === 'code' ? '\u7a0b\u5f0f\u78bc\u52a9\u7406' : '\u8cc7\u6599\u67e5\u8a62') + '\uff09\u6b63\u5728\u958b\u767c\u4e2d\uff0c\u9810\u8a08 Phase ' + ($json.intent === 'code' ? '3' : '4') + ' \u958b\u653e\u3002\\n\u76ee\u524d\u60a8\u53ef\u4ee5\u7528\u4e00\u822c\u554f\u7b54\u65b9\u5f0f\u63d0\u554f\uff0c\u4f8b\u5982\uff1a`@ai-assistant \u8acb\u89e3\u91cb SQL JOIN \u7684\u7528\u6cd5`' }) }}",
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+      "name": "Reply Phase Not Ready",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 350]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"text\": \"ok\"}"
+      },
+      "id": "c247e352-8418-4a62-8486-ad748d152ff6",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2450, 300]
+    }
+  ],
+  "connections": {
+    "Mattermost Webhook": {
+      "main": [[{"node": "Extract Message", "type": "main", "index": 0}]]
+    },
+    "Extract Message": {
+      "main": [[{"node": "Rate Limiter", "type": "main", "index": 0}]]
+    },
+    "Rate Limiter": {
+      "main": [[{"node": "IF Rate OK", "type": "main", "index": 0}]]
+    },
+    "IF Rate OK": {
+      "main": [
+        [{"node": "Intent Router", "type": "main", "index": 0}],
+        [{"node": "Reply Rate Limited", "type": "main", "index": 0}]
+      ]
+    },
+    "Intent Router": {
+      "main": [[{"node": "IF General", "type": "main", "index": 0}]]
+    },
+    "IF General": {
+      "main": [
+        [{"node": "Call Dify API", "type": "main", "index": 0}],
+        [{"node": "Reply Phase Not Ready", "type": "main", "index": 0}]
+      ]
+    },
+    "Call Dify API": {
+      "main": [[{"node": "Parse SSE Response", "type": "main", "index": 0}]]
+    },
+    "Parse SSE Response": {
+      "main": [[{"node": "Log Usage", "type": "main", "index": 0}]]
+    },
+    "Log Usage": {
+      "main": [[{"node": "Reply to Mattermost", "type": "main", "index": 0}]]
+    },
+    "Reply to Mattermost": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    },
+    "Reply Rate Limited": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    },
+    "Reply Phase Not Ready": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
