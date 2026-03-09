@@ -14,6 +14,10 @@ Mattermost (@ai-assistant 觸發)
   → Rate Limiter（每人每日 50 次）
   → Intent Router（general / code / data）
   → Call Dify API（SSE streaming）→ Parse → Log Usage → Reply
+
+Weekly Stats（每週一 09:00）
+  → Format Stats Report（讀取 Static Data）
+  → Post to #ai-stats（Markdown 週報）
 ```
 
 ## 重現步驟
@@ -72,6 +76,6 @@ curl -X POST -b cookie http://localhost:5678/rest/workflows/<WORKFLOW_ID>/activa
 
 | 檔案 | 用途 |
 |------|------|
-| `n8n/workflow-v2.json` | 13-node workflow（佔位符版，不含真實 token） |
+| `n8n/workflow-v2.json` | 16-node workflow（佔位符版，含週報，不含真實 token） |
 | `prompts/system-prompt.md` | Dify System Prompt 備份 |
 | `docs/user-guide.md` | 使用者指南（非技術人員版） |

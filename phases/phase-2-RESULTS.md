@@ -5,9 +5,10 @@
 
 ## 架構升級
 
-Phase 1（6 nodes 線性流程）→ Phase 2（13 nodes 含分支路由）
+Phase 1（6 nodes 線性流程）→ Phase 2（16 nodes 含分支路由 + 週報）
 
 ```
+主流程（Webhook 觸發）：
 [Mattermost Webhook]
   → [Extract Message]（+userId）
   → [Rate Limiter]（每人每日 50 次）
@@ -16,6 +17,9 @@ Phase 1（6 nodes 線性流程）→ Phase 2（13 nodes 含分支路由）
       │           ├─(yes)→ [Call Dify API] → [Parse SSE] → [Log Usage] → [Reply to MM] → [Respond]
       │           └─(no)→ [Reply: Phase Not Ready] → [Respond]
       └─(no)→ [Reply: Rate Limited] → [Respond]
+
+週報流程（Schedule 觸發，每週一 09:00）：
+[Weekly Stats Trigger] → [Format Stats Report] → [Post to AI Stats]
 ```
 
 ## 新增功能
@@ -29,6 +33,7 @@ Phase 1（6 nodes 線性流程）→ Phase 2（13 nodes 含分支路由）
 | 使用量統計 | Static Data 記錄 per-user 累計次數 | ✅ |
 | 多頻道支援 | Bot 加入所有公開頻道，Webhook 全頻道觸發 | ✅ |
 | System Prompt 客製化 | Dify Chatflow 內建（備份在 phase-2/prompts/） | ✅ |
+| 週報自動報告 | Schedule Trigger 每週一 09:00 發送到 #ai-stats | ✅ |
 
 ## Mattermost 新頻道
 
@@ -48,13 +53,14 @@ Phase 1（6 nodes 線性流程）→ Phase 2（13 nodes 含分支路由）
 | Rate Limiter 計數 | ✅ | per-user 獨立計數，日期變更自動重置 |
 | Log Usage 統計 | ✅ | totalRequests + per-user total 正確累計 |
 | 回饋提示 | ✅ | 底部顯示「剩餘額度：N/50 | 回饋 → #ai-feedback」 |
+| 週報發送 | ✅ | Markdown 格式統計報告成功發送到 #ai-stats |
 
 ## 檔案結構
 
 ```
 phase-2/
 ├── n8n/
-│   └── workflow-v2.json       # 13-node workflow（佔位符版）
+│   └── workflow-v2.json       # 16-node workflow（佔位符版，含週報）
 ├── prompts/
 │   └── system-prompt.md       # Dify System Prompt 備份
 ├── docs/
@@ -67,7 +73,7 @@ phase-2/
 
 - Workflow ID: `k7a5SzArbN3XpgDq`
 - Workflow Name: `Mattermost AI Assistant v2`
-- Nodes: 13
+- Nodes: 16
 - Active: true
 
 ## Phase 2 完成標準
@@ -80,7 +86,7 @@ phase-2/
 
 ## 待辦（Phase 2 後續）
 
-- [ ] 在 Dify UI 更新 System Prompt（需手動操作）
-- [ ] 建立 Weekly Stats 自動報告 workflow
+- [x] 在 Dify UI 更新 System Prompt（透過 Playwright 自動化完成）
+- [x] 建立 Weekly Stats 自動報告（同 workflow 內 Schedule Trigger）
 - [ ] 選定試行團隊，收集回饋
 - [ ] 將使用者指南發布到公司 wiki

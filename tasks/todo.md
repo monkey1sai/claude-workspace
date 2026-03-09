@@ -19,7 +19,7 @@
 
 ## 步驟 3：Dify System Prompt
 - [x] System Prompt 文字備份（phase-2/prompts/system-prompt.md）
-- [ ] 在 Dify UI 更新 Chatflow 的 System Prompt（需手動操作）
+- [x] 在 Dify UI 更新 Chatflow 的 System Prompt（透過 Playwright 自動化完成）
 
 ## 步驟 4：部署
 - [x] PATCH 更新 workflow 到 n8n（k7a5SzArbN3XpgDq）
@@ -37,8 +37,15 @@
 - [x] 驗證結果（phases/phase-2-RESULTS.md）
 - [x] 進度追蹤（tasks/todo.md — 本文件）
 
+## 步驟 7：Weekly Stats 自動報告
+
+- [x] 新增 Weekly Stats Trigger（Schedule, 每週一 09:00）
+- [x] 新增 Format Stats Report（Code node, 讀取 Static Data 格式化 Markdown）
+- [x] 新增 Post to AI Stats（HTTP Request, 發送到 #ai-stats）
+- [x] PATCH 部署 workflow（13 → 16 nodes）
+- [x] 測試發送週報到 #ai-stats 頻道
+
 ## 待辦
-- [ ] Dify UI 手動更新 System Prompt
-- [ ] 建立 Weekly Stats 自動報告 workflow
+
 - [ ] 選定試行團隊
 - [ ] 發布使用者指南到公司 wiki

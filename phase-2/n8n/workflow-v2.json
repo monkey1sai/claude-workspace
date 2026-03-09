@@ -12,7 +12,10 @@
       "name": "Mattermost Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "webhookId": "c21b0d84-1f0e-48c2-b811-6ce96084343c"
     },
     {
@@ -23,7 +26,10 @@
       "name": "Extract Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [470, 300]
+      "position": [
+        470,
+        300
+      ]
     },
     {
       "parameters": {
@@ -33,18 +39,27 @@
       "name": "Rate Limiter",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [690, 300]
+      "position": [
+        690,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
           "conditions": [
             {
               "id": "rate-check",
               "leftValue": "={{ $json.rateAllowed }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "true" }
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
             }
           ],
           "combinator": "and"
@@ -54,7 +69,10 @@
       "name": "IF Rate OK",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [910, 300]
+      "position": [
+        910,
+        300
+      ]
     },
     {
       "parameters": {
@@ -64,18 +82,27 @@
       "name": "Intent Router",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1130, 200]
+      "position": [
+        1130,
+        200
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
           "conditions": [
             {
               "id": "intent-check",
               "leftValue": "={{ $json.intent }}",
               "rightValue": "general",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -85,7 +112,10 @@
       "name": "IF General",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1350, 200]
+      "position": [
+        1350,
+        200
+      ]
     },
     {
       "parameters": {
@@ -94,8 +124,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "Authorization", "value": "Bearer <DIFY_APP_API_KEY>"},
-            {"name": "Content-Type", "value": "application/json"}
+            {
+              "name": "Authorization",
+              "value": "Bearer <DIFY_APP_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -114,27 +150,36 @@
       "name": "Call Dify API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1570, 100]
+      "position": [
+        1570,
+        100
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// 解析 Dify SSE 串流回應\nconst raw = $input.first().json.data || $input.first().json.body || '';\nconst text = typeof raw === 'string' ? raw : JSON.stringify(raw);\n\nlet answer = '';\nconst lines = text.split('\\n');\nfor (const line of lines) {\n  if (line.startsWith('data: ')) {\n    try {\n      const data = JSON.parse(line.substring(6));\n      if (data.answer) {\n        answer += data.answer;\n      }\n    } catch (e) {}\n  }\n}\n\nif (!answer) {\n  answer = '\u62b1\u6b49\uff0c\u7121\u6cd5\u8655\u7406\u60a8\u7684\u8acb\u6c42\u3002\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002';\n}\n\nconst channelId = $('Extract Message').first().json.channelId;\nconst userId = $('Extract Message').first().json.userId;\nconst userName = $('Extract Message').first().json.userName;\nconst rateRemaining = $('Rate Limiter').first().json.rateRemaining;\nconst dailyLimit = $('Rate Limiter').first().json.dailyLimit;\nreturn [{json: {answer, channelId, userId, userName, rateRemaining, dailyLimit}}];"
+        "jsCode": "// 解析 Dify SSE 串流回應\nconst raw = $input.first().json.data || $input.first().json.body || '';\nconst text = typeof raw === 'string' ? raw : JSON.stringify(raw);\n\nlet answer = '';\nconst lines = text.split('\\n');\nfor (const line of lines) {\n  if (line.startsWith('data: ')) {\n    try {\n      const data = JSON.parse(line.substring(6));\n      if (data.answer) {\n        answer += data.answer;\n      }\n    } catch (e) {}\n  }\n}\n\nif (!answer) {\n  answer = '抱歉，無法處理您的請求。請稍後再試。';\n}\n\nconst channelId = $('Extract Message').first().json.channelId;\nconst userId = $('Extract Message').first().json.userId;\nconst userName = $('Extract Message').first().json.userName;\nconst rateRemaining = $('Rate Limiter').first().json.rateRemaining;\nconst dailyLimit = $('Rate Limiter').first().json.dailyLimit;\nreturn [{json: {answer, channelId, userId, userName, rateRemaining, dailyLimit}}];"
       },
       "id": "153d0de6-bbfb-4e51-acd9-2a10da667649",
       "name": "Parse SSE Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1790, 100]
+      "position": [
+        1790,
+        100
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// \u8a18\u9304\u4f7f\u7528\u7d71\u8a08\u5230 Static Data\nconst staticData = $getWorkflowStaticData('global');\nconst userId = $json.userId;\nconst userName = $json.userName;\n\nif (!staticData.stats) {\n  staticData.stats = { totalRequests: 0, users: {} };\n}\nstaticData.stats.totalRequests++;\n\nif (!staticData.stats.users[userId]) {\n  staticData.stats.users[userId] = { name: userName, total: 0 };\n}\nstaticData.stats.users[userId].total++;\n\n// \u900f\u50b3\u539f\u59cb\u8cc7\u6599\nreturn [$input.first()];"
+        "jsCode": "// 記錄使用統計到 Static Data\nconst staticData = $getWorkflowStaticData('global');\nconst userId = $json.userId;\nconst userName = $json.userName;\n\nif (!staticData.stats) {\n  staticData.stats = { totalRequests: 0, users: {} };\n}\nstaticData.stats.totalRequests++;\n\nif (!staticData.stats.users[userId]) {\n  staticData.stats.users[userId] = { name: userName, total: 0 };\n}\nstaticData.stats.users[userId].total++;\n\n// 透傳原始資料\nreturn [$input.first()];"
       },
       "id": "f5e6d7c8-a9b0-4e1f-2a3b-4c5d6e7f8a9b",
       "name": "Log Usage",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2010, 100]
+      "position": [
+        2010,
+        100
+      ]
     },
     {
       "parameters": {
@@ -143,20 +188,29 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "Authorization", "value": "Bearer <MM_BOT_TOKEN>"},
-            {"name": "Content-Type", "value": "application/json"}
+            {
+              "name": "Authorization",
+              "value": "Bearer <MM_BOT_TOKEN>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ channel_id: $json.channelId, message: $json.answer + '\\n\\n---\\n_\u5269\u9918\u984d\u5ea6\uff1a' + $json.rateRemaining + '/' + $json.dailyLimit + ' | \u56de\u994b \u2192 #ai-feedback_' }) }}",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $json.channelId, message: $json.answer + '\\n\\n---\\n_剩餘額度：' + $json.rateRemaining + '/' + $json.dailyLimit + ' | 回饋 → #ai-feedback_' }) }}",
         "options": {}
       },
       "id": "e49e36fc-07c5-40e9-918f-3e1e17a7d091",
       "name": "Reply to Mattermost",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2230, 100]
+      "position": [
+        2230,
+        100
+      ]
     },
     {
       "parameters": {
@@ -165,20 +219,29 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "Authorization", "value": "Bearer <MM_BOT_TOKEN>"},
-            {"name": "Content-Type", "value": "application/json"}
+            {
+              "name": "Authorization",
+              "value": "Bearer <MM_BOT_TOKEN>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ channel_id: $('Extract Message').first().json.channelId, message: ':warning: @' + $('Extract Message').first().json.userName + ' \u4eca\u65e5 AI \u984d\u5ea6\u5df2\u7528\u5b8c\uff08' + $json.dailyLimit + '/' + $json.dailyLimit + ' \u6b21\uff09\u3002\u660e\u5929\u518d\u8a66\uff0c\u6216\u81f3 ~ai-feedback \u53cd\u6620\u984d\u5ea6\u9700\u6c42\u3002' }) }}",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $('Extract Message').first().json.channelId, message: ':warning: @' + $('Extract Message').first().json.userName + ' 今日 AI 額度已用完（' + $json.dailyLimit + '/' + $json.dailyLimit + ' 次）。明天再試，或至 ~ai-feedback 反映額度需求。' }) }}",
         "options": {}
       },
       "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
       "name": "Reply Rate Limited",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1130, 500]
+      "position": [
+        1130,
+        500
+      ]
     },
     {
       "parameters": {
@@ -187,20 +250,29 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "Authorization", "value": "Bearer <MM_BOT_TOKEN>"},
-            {"name": "Content-Type", "value": "application/json"}
+            {
+              "name": "Authorization",
+              "value": "Bearer <MM_BOT_TOKEN>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ channel_id: $('Extract Message').first().json.channelId, message: ':construction: \u6b64\u529f\u80fd\uff08' + ($json.intent === 'code' ? '\u7a0b\u5f0f\u78bc\u52a9\u7406' : '\u8cc7\u6599\u67e5\u8a62') + '\uff09\u6b63\u5728\u958b\u767c\u4e2d\uff0c\u9810\u8a08 Phase ' + ($json.intent === 'code' ? '3' : '4') + ' \u958b\u653e\u3002\\n\u76ee\u524d\u60a8\u53ef\u4ee5\u7528\u4e00\u822c\u554f\u7b54\u65b9\u5f0f\u63d0\u554f\uff0c\u4f8b\u5982\uff1a`@ai-assistant \u8acb\u89e3\u91cb SQL JOIN \u7684\u7528\u6cd5`' }) }}",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $('Extract Message').first().json.channelId, message: ':construction: 此功能（' + ($json.intent === 'code' ? '程式碼助理' : '資料查詢') + '）正在開發中，預計 Phase ' + ($json.intent === 'code' ? '3' : '4') + ' 開放。\\n目前您可以用一般問答方式提問，例如：`@ai-assistant 請解釋 SQL JOIN 的用法`' }) }}",
         "options": {}
       },
       "id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
       "name": "Reply Phase Not Ready",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1570, 350]
+      "position": [
+        1570,
+        350
+      ]
     },
     {
       "parameters": {
@@ -211,51 +283,244 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2450, 300]
+      "position": [
+        2450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "a1a1a1a1-b2b2-4c3c-d4d4-e5e5e5e5e5e5",
+      "name": "Weekly Stats Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 週報統計：讀取 Static Data 並格式化為 Markdown\nconst staticData = $getWorkflowStaticData('global');\nconst stats = staticData.stats || { totalRequests: 0, users: {} };\nconst rate = staticData.rate || {};\n\nconst now = new Date();\nconst weekStart = new Date(now);\nweekStart.setDate(now.getDate() - 7);\nconst dateRange = weekStart.toISOString().split('T')[0] + ' ~ ' + now.toISOString().split('T')[0];\n\n// 建構使用者排行\nconst userEntries = Object.entries(stats.users || {});\nuserEntries.sort((a, b) => b[1].total - a[1].total);\n\nlet table = '| 排名 | 使用者 | 累計次數 |\\n|------|--------|----------|\\n';\nuserEntries.forEach(([uid, info], idx) => {\n  table += '| ' + (idx + 1) + ' | ' + info.name + ' | ' + info.total + ' |\\n';\n});\n\nconst activeToday = Object.keys(rate).length;\nconst totalUsers = userEntries.length;\n\nconst message = ':bar_chart: **AI 助手週報** (' + dateRange + ')\\n\\n'\n  + '- 累計請求數：**' + stats.totalRequests + '**\\n'\n  + '- 累計使用者數：**' + totalUsers + '**\\n'\n  + '- 今日活躍使用者：**' + activeToday + '**\\n\\n'\n  + '### 使用者排行\\n\\n' + table;\n\nreturn [{ json: { message } }];"
+      },
+      "id": "b2b2b2b2-c3c3-4d4d-e5e5-f6f6f6f6f6f6",
+      "name": "Format Stats Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8065/api/v4/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <MM_BOT_TOKEN>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel_id: \"pse5g5abxift5by3wttecycusc\", message: $json.message }) }}",
+        "options": {}
+      },
+      "id": "c3c3c3c3-d4d4-4e5e-f6f6-a7a7a7a7a7a7",
+      "name": "Post to AI Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        700
+      ]
     }
   ],
   "connections": {
     "Mattermost Webhook": {
-      "main": [[{"node": "Extract Message", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Extract Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Extract Message": {
-      "main": [[{"node": "Rate Limiter", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Rate Limiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Rate Limiter": {
-      "main": [[{"node": "IF Rate OK", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "IF Rate OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF Rate OK": {
       "main": [
-        [{"node": "Intent Router", "type": "main", "index": 0}],
-        [{"node": "Reply Rate Limited", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Intent Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Rate Limited",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Intent Router": {
-      "main": [[{"node": "IF General", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "IF General",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF General": {
       "main": [
-        [{"node": "Call Dify API", "type": "main", "index": 0}],
-        [{"node": "Reply Phase Not Ready", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Call Dify API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Phase Not Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Call Dify API": {
-      "main": [[{"node": "Parse SSE Response", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Parse SSE Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse SSE Response": {
-      "main": [[{"node": "Log Usage", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Log Usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log Usage": {
-      "main": [[{"node": "Reply to Mattermost", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Reply to Mattermost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Reply to Mattermost": {
-      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Reply Rate Limited": {
-      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Reply Phase Not Ready": {
-      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Stats Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Stats Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Stats Report": {
+      "main": [
+        [
+          {
+            "node": "Post to AI Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
