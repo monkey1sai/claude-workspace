@@ -3,8 +3,10 @@ credentials.env
 .env
 */.env
 
-# Dify data
-dify/dify/docker/volumes/
+# Dify data (git clone, not tracked)
+dify/
 
-# Docker volumes (if local)
-*/data/
+# Docker volumes (runtime data — SQLite, PostgreSQL, logs, plugins)
+# 這些資料透過 bind mount 映射到 */volumes/ 目錄
+# 根目錄 .gitignore 的 **/volumes/ 已涵蓋，此處為雙重保險
+*/volumes/

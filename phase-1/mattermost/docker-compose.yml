@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   mm-postgres:
     image: postgres:15-alpine
@@ -6,7 +5,7 @@ services:
     env_file:
       - .env
     volumes:
-      - mm_pgdata:/var/lib/postgresql/data
+      - ./volumes/pgdata:/var/lib/postgresql/data
 
   mattermost:
     image: mattermost/mattermost-team-edition:latest
@@ -20,16 +19,8 @@ services:
     ports:
       - "8065:8065"
     volumes:
-      - mm_data:/mattermost/data
-      - mm_logs:/mattermost/logs
-      - mm_config:/mattermost/config
-      - mm_plugins:/mattermost/plugins
-      - mm_client_plugins:/mattermost/client/plugins
-
-volumes:
-  mm_pgdata:
-  mm_data:
-  mm_logs:
-  mm_config:
-  mm_plugins:
-  mm_client_plugins:
+      - ./volumes/data:/mattermost/data
+      - ./volumes/logs:/mattermost/logs
+      - ./volumes/config:/mattermost/config
+      - ./volumes/plugins:/mattermost/plugins
+      - ./volumes/client_plugins:/mattermost/client/plugins

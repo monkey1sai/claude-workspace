@@ -356,21 +356,35 @@ for pid in data['order'][:3]:
 ### 服務停止/重啟後恢復
 
 ```bash
-# 資料保存在 Docker volumes 中，重啟即可恢復
+# 資料保存在 bind mount (./volumes/) 中，重啟即可恢復
 cd phase-1/n8n && docker compose up -d
 cd phase-1/dify/dify/docker && docker compose up -d
 cd phase-1/mattermost && docker compose up -d
 ```
 
-無需重新初始化（帳號、workflow、頻道都在 volume 裡）。
+無需重新初始化（帳號、workflow、頻道都在 bind mount 的 `./volumes/` 目錄裡）。
+
+### 資料儲存說明
+
+n8n 和 Mattermost 使用 **bind mount** 將容器內的資料映射到專案目錄：
+
+| 服務 | 本機路徑 | 包含內容 |
+|------|----------|----------|
+| n8n | `phase-1/n8n/volumes/data/` | Workflow 定義、Credentials、執行紀錄（SQLite） |
+| Mattermost | `phase-1/mattermost/volumes/config/` | 系統設定（config.json） |
+| Mattermost | `phase-1/mattermost/volumes/data/` | 使用者上傳的檔案 |
+| Mattermost | `phase-1/mattermost/volumes/pgdata/` | PostgreSQL 資料庫（帳號、頻道、對話紀錄） |
+| Mattermost | `phase-1/mattermost/volumes/plugins/` | 已安裝的 plugins |
+
+這些 `volumes/` 目錄已被 `.gitignore` 排除（二進位資料不適合版控），但存在本機方便備份。
 
 ### 完全刪除重建
 
 ```bash
 # ⚠️ 會清除所有資料！
-cd phase-1/n8n && docker compose down -v
+cd phase-1/n8n && docker compose down && rm -rf volumes/
 cd phase-1/dify/dify/docker && docker compose down -v
-cd phase-1/mattermost && docker compose down -v
+cd phase-1/mattermost && docker compose down && rm -rf volumes/
 # 然後從步驟 2 重新開始
 ```
 
