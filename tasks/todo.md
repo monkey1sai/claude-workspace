@@ -49,3 +49,55 @@
 
 - [ ] 選定試行團隊
 - [ ] 發布使用者指南到公司 wiki
+
+---
+
+# Phase 3：開發者 Agent - 執行追蹤
+
+> 完成日期：2026-03-09
+
+## 步驟 1：目錄結構 + 環境準備
+
+- [x] 建立 phase-3/ 目錄結構
+- [x] 確認 Anthropic API Key 可直接呼叫
+- [x] 在 credentials.env 新增 ANTHROPIC_API_KEY
+
+## 步驟 2：修改 Intent Router
+
+- [x] 新增 analysisVerbs 修正 SQL 分析被誤判為 data 意圖
+- [x] 增強 code 關鍵字（含中英文）
+
+## 步驟 3：新增 code 分支節點（16 → 23 nodes）
+
+- [x] IF Code Intent — 判斷 intent === 'code'
+- [x] Code Sub-Router — 細分子意圖（pr-review/bug-analysis/code-explain/test-gen/doc-gen）
+- [x] IF PR Review — 判斷是否需要 GitHub API
+- [x] Fetch PR Diff — GitHub REST API 取得 PR diff
+- [x] Build Code Prompt — 根據子意圖組裝 system prompt + user message
+- [x] Call Claude API for Code — Anthropic API 直呼（claude-haiku-4-5-20251001）
+- [x] Format Code Response — 解析回應 + 加 icon + 額度提示
+
+## 步驟 4：Python 腳本建構 workflow JSON
+
+- [x] 建立 phase-3/scripts/build-workflow-v3.py
+- [x] 產生 phase-3/n8n/workflow-v3.json（23 nodes，佔位符版本）
+- [x] 修正 IF branch 連接（main[0]=TRUE, main[1]=FALSE）
+- [x] 修正 n8n PATCH API 需要 hash 欄位（optimistic locking）
+
+## 步驟 5：部署 + 端對端測試
+
+- [x] PATCH 更新 workflow 到 n8n（k7a5SzArbN3XpgDq）
+- [x] 啟用 workflow
+- [x] Bug 分析測試通過（:beetle: 結構化分析，3032 chars）
+- [x] 測試生成測試通過（:white_check_mark: 完整 Jest 測試，3237 chars）
+- [x] SQL 分析修正驗證（走 general → Dify，不再誤判為 data）
+- [x] 一般問答不受影響（仍走 Dify）
+
+## 步驟 6：文件 + Commit
+
+- [x] System prompt 備份（phase-3/prompts/code-prompts.md）
+- [x] Phase 3 README（phase-3/README.md）
+- [x] 驗證結果（phases/phase-3-RESULTS.md）
+- [x] 開發者使用指南（phase-3/docs/dev-guide.md）
+- [x] 更新 memory/lessons.md + MEMORY.md
+- [ ] Git commit + push

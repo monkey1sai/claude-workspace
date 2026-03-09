@@ -1,0 +1,812 @@
+{
+  "name": "Mattermost AI Assistant v3",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mattermost-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7928fe47-7a9f-4cc8-988e-6110938d24f2",
+      "name": "Mattermost Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "c21b0d84-1f0e-48c2-b811-6ce96084343c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 提取 Mattermost Outgoing Webhook 的訊息內容\nconst body = $input.first().json.body;\nconst text = body.text || '';\nconst query = text.replace(/@ai-assistant/gi, '').trim();\nconst channelId = body.channel_id;\nconst userName = body.user_name || 'user';\nconst userId = body.user_id || 'unknown';\nreturn [{json: {query: query || 'hello', channelId, userName, userId}}];"
+      },
+      "id": "7f2edfb5-0d2d-4bdd-b0e2-172562a84de4",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 每人每日額度限制（使用 workflow static data 持久化）\nconst staticData = $getWorkflowStaticData('global');\nconst userId = $json.userId;\nconst today = new Date().toISOString().split('T')[0];\nconst DAILY_LIMIT = 50;\n\n// 初始化 rate 資料結構\nif (!staticData.rate) staticData.rate = {};\nconst key = userId;\n\n// 日期變更時重置計數\nif (!staticData.rate[key] || staticData.rate[key].date !== today) {\n  staticData.rate[key] = { date: today, count: 0 };\n}\n\nconst currentCount = staticData.rate[key].count;\nconst isAllowed = currentCount < DAILY_LIMIT;\n\nif (isAllowed) {\n  staticData.rate[key].count = currentCount + 1;\n}\n\nreturn [{json: {\n  ...$json,\n  rateAllowed: isAllowed,\n  rateRemaining: Math.max(0, DAILY_LIMIT - currentCount - (isAllowed ? 1 : 0)),\n  rateCount: currentCount + (isAllowed ? 1 : 0),\n  dailyLimit: DAILY_LIMIT\n}}];"
+      },
+      "id": "b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "Rate Limiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        690,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "rate-check",
+              "leftValue": "={{ $json.rateAllowed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c2b3a4d5-f6e7-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "IF Rate OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        910,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 意圖路由：關鍵字分類（Phase 3 升級版）\n// 修正：SQL 分析/解釋不再誤判為 data 意圖\nconst query = $json.query.toLowerCase();\n\n// 分析動詞（有這些動詞時，即使包含 SQL 也歸類為 general/code）\nconst analysisVerbs = ['分析', '解釋', '說明', '最佳化', '優化', 'analyze', 'explain', 'optimize', 'review'];\nconst hasAnalysisVerb = analysisVerbs.some(v => query.includes(v));\n\n// 程式碼相關關鍵字（Phase 3 開放）\nconst codeKeywords = [\n  'review pr', 'pr review', 'code review', 'review code',\n  'pr #', 'pr#', 'pull request',\n  'write test', 'gen test', 'generate test',\n  'debug', 'analyze bug', 'stack trace',\n  'explain code', 'explain this',\n  'refactor',\n  '程式碼審查', '寫測試', '分析錯誤', '產生測試',\n  '生成文件', 'generate doc', 'gen doc',\n  '解釋程式碼', '重構'\n];\n\n// 資料查詢關鍵字（Phase 4 才開放）\n// 注意：只有明確要求「查資料庫」「跑報表」才觸發，純 SQL 分析歸為 code\nconst dataKeywords = ['query db', '查資料庫', '跑報表', '資料庫查詢', '幫我查', '查一下資料'];\n\n// 偵測程式碼區塊（使用者直接貼程式碼）\nconst hasCodeBlock = query.includes('```');\n\nlet intent = 'general';\n\n// 先檢查是否有 code block\nif (hasCodeBlock) {\n  intent = 'code';\n} else {\n  // 檢查 code 關鍵字\n  for (const kw of codeKeywords) {\n    if (query.includes(kw)) { intent = 'code'; break; }\n  }\n  // 只有沒有分析動詞時才檢查 data 關鍵字\n  if (intent === 'general' && !hasAnalysisVerb) {\n    for (const kw of dataKeywords) {\n      if (query.includes(kw)) { intent = 'data'; break; }\n    }\n  }\n}\n\nreturn [{json: { ...$json, intent }}];"
+      },
+      "id": "d3c4b5a6-e7f8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "Intent Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1130,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "intent-check",
+              "leftValue": "={{ $json.intent }}",
+              "rightValue": "general",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "e4d5c6b7-f8a9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "IF General",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1350,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3080/v1/chat-messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <DIFY_APP_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ inputs: {}, query: $json.query, response_mode: 'streaming', user: $json.userName }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "a57f3416-bcea-449d-a24f-d5f8804c8352",
+      "name": "Call Dify API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1570,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析 Dify SSE 串流回應\nconst raw = $input.first().json.data || $input.first().json.body || '';\nconst text = typeof raw === 'string' ? raw : JSON.stringify(raw);\n\nlet answer = '';\nconst lines = text.split('\\n');\nfor (const line of lines) {\n  if (line.startsWith('data: ')) {\n    try {\n      const data = JSON.parse(line.substring(6));\n      if (data.answer) {\n        answer += data.answer;\n      }\n    } catch (e) {}\n  }\n}\n\nif (!answer) {\n  answer = '抱歉，無法處理您的請求。請稍後再試。';\n}\n\nconst channelId = $('Extract Message').first().json.channelId;\nconst userId = $('Extract Message').first().json.userId;\nconst userName = $('Extract Message').first().json.userName;\nconst rateRemaining = $('Rate Limiter').first().json.rateRemaining;\nconst dailyLimit = $('Rate Limiter').first().json.dailyLimit;\nreturn [{json: {answer, channelId, userId, userName, rateRemaining, dailyLimit}}];"
+      },
+      "id": "153d0de6-bbfb-4e51-acd9-2a10da667649",
+      "name": "Parse SSE Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1790,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 記錄使用統計到 Static Data\nconst staticData = $getWorkflowStaticData('global');\nconst userId = $json.userId;\nconst userName = $json.userName;\n\nif (!staticData.stats) {\n  staticData.stats = { totalRequests: 0, users: {} };\n}\nstaticData.stats.totalRequests++;\n\nif (!staticData.stats.users[userId]) {\n  staticData.stats.users[userId] = { name: userName, total: 0 };\n}\nstaticData.stats.users[userId].total++;\n\n// 透傳原始資料\nreturn [$input.first()];"
+      },
+      "id": "f5e6d7c8-a9b0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "Log Usage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2010,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8065/api/v4/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <MM_BOT_TOKEN>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $json.channelId, message: $json.answer + '\\n\\n---\\n_剩餘額度：' + $json.rateRemaining + '/' + $json.dailyLimit + ' | 回饋 → #ai-feedback_' }) }}",
+        "options": {}
+      },
+      "id": "e49e36fc-07c5-40e9-918f-3e1e17a7d091",
+      "name": "Reply to Mattermost",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2230,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8065/api/v4/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <MM_BOT_TOKEN>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $('Extract Message').first().json.channelId, message: ':warning: @' + $('Extract Message').first().json.userName + ' 今日 AI 額度已用完（' + $json.dailyLimit + '/' + $json.dailyLimit + ' 次）。明天再試，或至 ~ai-feedback 反映額度需求。' }) }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+      "name": "Reply Rate Limited",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1130,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8065/api/v4/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <MM_BOT_TOKEN>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel_id: $('Extract Message').first().json.channelId, message: ':construction: 此功能（' + ($json.intent === 'code' ? '程式碼助理' : '資料查詢') + '）正在開發中，預計 Phase ' + ($json.intent === 'code' ? '3' : '4') + ' 開放。\\n目前您可以用一般問答方式提問，例如：`@ai-assistant 請解釋 SQL JOIN 的用法`' }) }}",
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+      "name": "Reply Phase Not Ready",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1570,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"text\": \"ok\"}"
+      },
+      "id": "c247e352-8418-4a62-8486-ad748d152ff6",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "a1a1a1a1-b2b2-4c3c-d4d4-e5e5e5e5e5e5",
+      "name": "Weekly Stats Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 週報統計：讀取 Static Data 並格式化為 Markdown\nconst staticData = $getWorkflowStaticData('global');\nconst stats = staticData.stats || { totalRequests: 0, users: {} };\nconst rate = staticData.rate || {};\n\nconst now = new Date();\nconst weekStart = new Date(now);\nweekStart.setDate(now.getDate() - 7);\nconst dateRange = weekStart.toISOString().split('T')[0] + ' ~ ' + now.toISOString().split('T')[0];\n\n// 建構使用者排行\nconst userEntries = Object.entries(stats.users || {});\nuserEntries.sort((a, b) => b[1].total - a[1].total);\n\nlet table = '| 排名 | 使用者 | 累計次數 |\\n|------|--------|----------|\\n';\nuserEntries.forEach(([uid, info], idx) => {\n  table += '| ' + (idx + 1) + ' | ' + info.name + ' | ' + info.total + ' |\\n';\n});\n\nconst activeToday = Object.keys(rate).length;\nconst totalUsers = userEntries.length;\n\nconst message = ':bar_chart: **AI 助手週報** (' + dateRange + ')\\n\\n'\n  + '- 累計請求數：**' + stats.totalRequests + '**\\n'\n  + '- 累計使用者數：**' + totalUsers + '**\\n'\n  + '- 今日活躍使用者：**' + activeToday + '**\\n\\n'\n  + '### 使用者排行\\n\\n' + table;\n\nreturn [{ json: { message } }];"
+      },
+      "id": "b2b2b2b2-c3c3-4d4d-e5e5-f6f6f6f6f6f6",
+      "name": "Format Stats Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8065/api/v4/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <MM_BOT_TOKEN>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel_id: \"pse5g5abxift5by3wttecycusc\", message: $json.message }) }}",
+        "options": {}
+      },
+      "id": "c3c3c3c3-d4d4-4e5e-f6f6-a7a7a7a7a7a7",
+      "name": "Post to AI Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "1dc8abda-06bf-4de8-a082-d979494300db",
+              "leftValue": "={{ $json.intent }}",
+              "rightValue": "code",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4c9ae4ac-5413-4579-98b9-bf8de9b0728d",
+      "name": "IF Code Intent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 細分 code 子意圖 + 解析參數\nconst query = $json.query;\nconst queryLower = query.toLowerCase();\n\nlet subIntent = 'code-explain'; // 預設：程式碼說明\nlet params = {};\n\n// PR Review：匹配 PR#123, PR 123, review pr 123 等\nconst prMatch = query.match(/(?:pr|pull\\s*request)\\s*#?\\s*(\\d+)/i);\nif (prMatch || queryLower.includes('review pr') || queryLower.includes('pr review') || queryLower.includes('code review') || queryLower.includes('程式碼審查')) {\n  subIntent = 'pr-review';\n  params.prNumber = prMatch ? prMatch[1] : null;\n  // 嘗試提取 repo（格式：owner/repo）\n  const repoMatch = query.match(/(?:in|from|for)\\s+([\\w\\-]+\\/[\\w\\-]+)/i);\n  params.repo = repoMatch ? repoMatch[1] : null;\n}\n\n// Bug 分析\nelse if (queryLower.includes('bug') || queryLower.includes('error') || queryLower.includes('analyze bug') || queryLower.includes('stack trace') || queryLower.includes('分析錯誤') || queryLower.includes('debug')) {\n  subIntent = 'bug-analysis';\n}\n\n// 測試生成\nelse if (queryLower.includes('write test') || queryLower.includes('gen test') || queryLower.includes('寫測試') || queryLower.includes('測試') || queryLower.includes('產生測試')) {\n  subIntent = 'test-gen';\n}\n\n// 文件生成\nelse if (queryLower.includes('doc') || queryLower.includes('文件') || queryLower.includes('generate doc') || queryLower.includes('生成文件')) {\n  subIntent = 'doc-gen';\n}\n\n// 重構\nelse if (queryLower.includes('refactor') || queryLower.includes('重構')) {\n  subIntent = 'code-explain';\n}\n\n// 提取程式碼區塊\nconst codeBlockMatch = query.match(/```[\\s\\S]*?```/);\nconst codeBlock = codeBlockMatch ? codeBlockMatch[0] : null;\n\nreturn [{json: {\n  ...$json,\n  subIntent,\n  params,\n  codeBlock\n}}];"
+      },
+      "id": "1436078b-02c6-4b67-870d-3a8bc4f1d687",
+      "name": "Code Sub-Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "f03428c9-e6d7-4b4a-8a79-f40638fe27cb",
+              "leftValue": "={{ $json.subIntent }}",
+              "rightValue": "pr-review",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "42b1d10f-0722-4483-9226-285b2378c80e",
+              "leftValue": "={{ $json.params.prNumber }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8dadd463-c812-46e5-8032-1c5d752daeed",
+      "name": "IF PR Review",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/{{ $json.params.repo || '<GITHUB_DEFAULT_REPO>' }}/pulls/{{ $json.params.prNumber }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <GITHUB_TOKEN>"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3.diff"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-ai-assistant"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "27a89b3b-d856-4b1c-9846-316aa03bf109",
+      "name": "Fetch PR Diff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 根據子意圖組裝 system prompt + user message\nconst subIntent = $json.subIntent || $('Code Sub-Router').first().json.subIntent;\nconst query = $json.query || $('Code Sub-Router').first().json.query;\nconst codeBlock = $json.codeBlock || $('Code Sub-Router').first().json.codeBlock;\n\nconst systemPrompts = {\n  'pr-review': '你是資深軟體工程師，負責 Code Review。分析以下 PR diff 並提供：\\n1. **摘要**：這個 PR 做了什麼\\n2. **問題**：潛在的 bug、安全風險、效能問題（標示嚴重程度：🔴高/🟡中/🟢低）\\n3. **建議**：改進建議\\n4. **結論**：是否建議合併（✅/⚠️/❌）\\n使用繁體中文回覆。',\n\n  'bug-analysis': '你是資深 DevOps 工程師，擅長分析錯誤和 bug。分析以下錯誤資訊並提供：\\n1. **根因分析**：最可能的原因\\n2. **影響範圍**：受影響的功能\\n3. **修復建議**：具體的修復步驟\\n4. **預防措施**：如何避免再次發生\\n使用繁體中文回覆。',\n\n  'code-explain': '你是技術文件撰寫者。用清晰易懂的方式解釋以下程式碼：\\n1. **功能概述**：這段程式碼的目的\\n2. **逐段說明**：關鍵邏輯的解釋\\n3. **使用範例**：如何使用（若適用）\\n使用繁體中文回覆。',\n\n  'test-gen': '你是測試工程師。為以下程式碼生成測試：\\n1. 使用合適的測試框架（Jest/Mocha/pytest 等，根據語言判斷）\\n2. 涵蓋正常情況、邊界情況、錯誤處理\\n3. 測試命名清晰\\n4. 加上繁體中文註解\\n直接輸出可執行的測試程式碼。',\n\n  'doc-gen': '你是技術文件撰寫者。為以下程式碼生成文件：\\n1. 函式/類別說明\\n2. 參數和回傳值\\n3. 使用範例\\n4. 注意事項\\n輸出 Markdown 格式，使用繁體中文。'\n};\n\nconst systemPrompt = systemPrompts[subIntent] || systemPrompts['code-explain'];\n\n// 組裝 user message\nlet userMessage = query;\n\n// 如果是 PR review 且有 diff 資料\nconst prDiff = $json.data || $json.body || null;\nif (subIntent === 'pr-review' && prDiff) {\n  // 截斷過長的 diff（避免超過 context window）\n  const diffText = typeof prDiff === 'string' ? prDiff : JSON.stringify(prDiff);\n  const maxLen = 80000;\n  const truncated = diffText.length > maxLen ? diffText.substring(0, maxLen) + '\\n... (diff 已截斷)' : diffText;\n  userMessage = 'PR Diff:\\n\\n' + truncated;\n}\n\n// 從上游取得 channel 和 user 資訊\nconst channelId = $('Extract Message').first().json.channelId;\nconst userId = $('Extract Message').first().json.userId;\nconst userName = $('Extract Message').first().json.userName;\nconst rateRemaining = $('Rate Limiter').first().json.rateRemaining;\nconst dailyLimit = $('Rate Limiter').first().json.dailyLimit;\n\nreturn [{json: {\n  systemPrompt,\n  userMessage,\n  subIntent,\n  channelId,\n  userId,\n  userName,\n  rateRemaining,\n  dailyLimit\n}}];"
+      },
+      "id": "a56160d3-e605-41e8-bffd-f3270af6ce6e",
+      "name": "Build Code Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "<ANTHROPIC_API_KEY>"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"claude-haiku-4-5-20251001\", max_tokens: 4096, system: $json.systemPrompt, messages: [{ role: \"user\", content: $json.userMessage }] }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "0b826f73-80ac-4660-ac88-6190e85040b0",
+      "name": "Call Claude API for Code",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析 Anthropic API 回應 + 格式化\nconst response = $json;\nconst content = response.content && response.content[0] ? response.content[0].text : '無法取得回應，請稍後再試。';\n\nconst subIntent = $('Build Code Prompt').first().json.subIntent;\nconst channelId = $('Build Code Prompt').first().json.channelId;\nconst userId = $('Build Code Prompt').first().json.userId;\nconst userName = $('Build Code Prompt').first().json.userName;\nconst rateRemaining = $('Build Code Prompt').first().json.rateRemaining;\nconst dailyLimit = $('Build Code Prompt').first().json.dailyLimit;\n\nconst icons = {\n  'pr-review': ':mag:',\n  'bug-analysis': ':beetle:',\n  'code-explain': ':books:',\n  'test-gen': ':white_check_mark:',\n  'doc-gen': ':page_facing_up:'\n};\n\nconst titles = {\n  'pr-review': 'Code Review 結果',\n  'bug-analysis': 'Bug 分析結果',\n  'code-explain': '程式碼說明',\n  'test-gen': '測試程式碼',\n  'doc-gen': '文件生成結果'\n};\n\nconst icon = icons[subIntent] || ':robot:';\nconst title = titles[subIntent] || 'AI 助手回覆';\n\n// 截斷過長回覆（Mattermost 訊息限制 ~16000 字元）\nlet body = content;\nif (body.length > 14000) {\n  body = body.substring(0, 14000) + '\\n\\n... (回覆過長已截斷)';\n}\n\nconst answer = icon + ' **' + title + '**\\n\\n' + body;\n\nreturn [{json: {answer, channelId, userId, userName, rateRemaining, dailyLimit}}];"
+      },
+      "id": "82639032-b751-4978-aa13-039c386de062",
+      "name": "Format Code Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Mattermost Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message": {
+      "main": [
+        [
+          {
+            "node": "Rate Limiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limiter": {
+      "main": [
+        [
+          {
+            "node": "IF Rate OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Rate OK": {
+      "main": [
+        [
+          {
+            "node": "Intent Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Rate Limited",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Router": {
+      "main": [
+        [
+          {
+            "node": "IF General",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF General": {
+      "main": [
+        [
+          {
+            "node": "Call Dify API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF Code Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Dify API": {
+      "main": [
+        [
+          {
+            "node": "Parse SSE Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse SSE Response": {
+      "main": [
+        [
+          {
+            "node": "Log Usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Usage": {
+      "main": [
+        [
+          {
+            "node": "Reply to Mattermost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to Mattermost": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Rate Limited": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Phase Not Ready": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Stats Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Stats Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Stats Report": {
+      "main": [
+        [
+          {
+            "node": "Post to AI Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Code Intent": {
+      "main": [
+        [
+          {
+            "node": "Code Sub-Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Phase Not Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Sub-Router": {
+      "main": [
+        [
+          {
+            "node": "IF PR Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF PR Review": {
+      "main": [
+        [
+          {
+            "node": "Fetch PR Diff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Code Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch PR Diff": {
+      "main": [
+        [
+          {
+            "node": "Build Code Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Code Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call Claude API for Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude API for Code": {
+      "main": [
+        [
+          {
+            "node": "Format Code Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Code Response": {
+      "main": [
+        [
+          {
+            "node": "Log Usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

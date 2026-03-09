@@ -1,5 +1,8 @@
 # Phase 1：基礎建設
 
+> **⚠️ 此為原始計畫書，已過時。實際部署結果請參閱 [phase-1-RESULTS.md](phase-1-RESULTS.md)**
+> 主要差異：Slack 改為 Mattermost、named volume 改為 bind mount、version 標籤已移除
+>
 > 時間：2 週
 > 目標：部署 n8n + Dify 自託管環境 + Slack Bot
 > 前置：Phase 0 驗證通過

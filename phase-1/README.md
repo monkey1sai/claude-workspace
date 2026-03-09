@@ -34,8 +34,9 @@ phase-1/
 ├── .gitignore             # 排除敏感檔案和 volumes
 ├── n8n/
 │   ├── .env               # n8n 環境變數
-│   ├── docker-compose.yml # n8n 容器（1 container）
-│   └── workflow.json      # Mattermost AI Assistant workflow 定義
+│   ├── docker-compose.yml # n8n 容器（1 container，bind mount）
+│   ├── workflow.json      # Mattermost AI Assistant workflow 定義
+│   └── volumes/data/      # n8n 資料（SQLite, credentials）— .gitignore 排除
 ├── dify/
 │   └── dify/              # Dify git clone（含 docker/ 子目錄）
 │       └── docker/
@@ -43,7 +44,15 @@ phase-1/
 │           └── docker-compose.yaml  # Dify 容器（11 containers）
 └── mattermost/
     ├── .env               # Mattermost + PostgreSQL 環境變數
-    └── docker-compose.yml # Mattermost 容器（2 containers）
+    ├── docker-compose.yml # Mattermost 容器（2 containers，bind mount）
+    ├── config-export.json  # 關鍵系統設定備份
+    └── volumes/           # 運行時資料 — .gitignore 排除
+        ├── pgdata/        #   PostgreSQL（帳號、頻道、對話紀錄）
+        ├── config/        #   Mattermost 系統設定
+        ├── data/          #   使用者上傳檔案
+        ├── logs/          #   服務日誌
+        ├── plugins/       #   已安裝 plugins
+        └── client_plugins/ #  前端 plugins
 ```
 
 ## 服務清單

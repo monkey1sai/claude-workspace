@@ -101,6 +101,12 @@ MM_TEAM_ID=<建立後填入>
 MM_TOWN_SQUARE_CHANNEL_ID=<建立後填入>
 MM_WEBHOOK_ID=<建立後填入>
 
+# === Anthropic API (Phase 3 直接呼叫) ===
+ANTHROPIC_API_KEY=<Anthropic API Key>
+
+# === GitHub (Phase 3 PR Review) ===
+GITHUB_TOKEN=<GitHub Personal Access Token>
+
 # === Dify ===
 DIFY_URL=http://localhost:3080
 DIFY_ADMIN_EMAIL=admin@example.com
@@ -285,10 +291,10 @@ curl -s -X POST http://localhost:8065/api/v4/hooks/outgoing \
 ## 步驟 4：部署 n8n Workflow
 
 ```bash
-# 替換 workflow-v2.json 中的佔位符
-cd phase-2/n8n
-sed "s/<DIFY_APP_API_KEY>/$DIFY_APP_API_KEY/g; s/<MM_BOT_TOKEN>/$BOT_TOKEN/g" \
-  workflow-v2.json > /tmp/workflow-deploy.json
+# 替換 workflow-v3.json 中的佔位符（Phase 3，23 nodes）
+cd phase-3/n8n
+sed "s/<DIFY_APP_API_KEY>/$DIFY_APP_API_KEY/g; s/<MM_BOT_TOKEN>/$BOT_TOKEN/g; s/<ANTHROPIC_API_KEY>/$ANTHROPIC_API_KEY/g; s/<GITHUB_TOKEN>/$GITHUB_TOKEN/g" \
+  workflow-v3.json > /tmp/workflow-deploy.json
 
 # 登入 n8n
 curl -c /tmp/n8n-cookie -X POST http://localhost:5678/rest/login \
@@ -407,8 +413,10 @@ cd phase-1/mattermost && docker compose down && rm -rf volumes/
     → Extract Message（提取 query, userId）
     → Rate Limiter（50 次/人/天）
     → Intent Router（general/code/data）
-    → Call Dify API (:3080, SSE streaming)
-    → Parse SSE → Log Usage → Reply to Mattermost
+    → [general] Call Dify API (:3080, SSE streaming) → Parse SSE
+    → [code] Code Sub-Router → Build Prompt → Call Claude API → Format Response
+    → [data] Reply "Phase 4 開放"
+    → Log Usage → Reply to Mattermost
   → Bot 回覆使用者
 
 Weekly Stats（每週一 09:00）
@@ -423,6 +431,8 @@ Weekly Stats（每週一 09:00）
 | Dify 容器 | — | `phase-1/dify/dify/docker/.env` |
 | Mattermost 容器 | `phase-1/mattermost/docker-compose.yml` | `phase-1/mattermost/.env` |
 | MM 設定備份 | `phase-1/mattermost/config-export.json` | — |
-| Workflow (Phase 2) | `phase-2/n8n/workflow-v2.json` | 佔位符需替換 |
+| Workflow (Phase 3) | `phase-3/n8n/workflow-v3.json` | 佔位符需替換 |
+| Workflow (Phase 2, 備份) | `phase-2/n8n/workflow-v2.json` | — |
 | System Prompt | `phase-2/prompts/system-prompt.md` | 需貼到 Dify UI |
+| Code Prompts | `phase-3/prompts/code-prompts.md` | 已嵌入 workflow |
 | 密碼集中管理 | — | `phase-1/credentials.env` |

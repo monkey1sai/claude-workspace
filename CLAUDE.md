@@ -54,7 +54,7 @@ claude-workspace/
 ### Docker / Infrastructure
 - 所有敏感值存在 `.env` 檔案中，不 hardcode
 - `docker-compose.yml` 使用 `env_file` 引用 `.env`
-- Volume 名稱有意義（如 `n8n_data`, `mm_pgdata`）
+- n8n 和 Mattermost 使用 **bind mount**（`./volumes/`），不使用 named volume
 - 服務間用 `host.docker.internal` 通訊（Docker Desktop）
 
 ### n8n Workflow
@@ -78,6 +78,23 @@ claude-workspace/
 5. 更新對應的 `phase-N/README.md` 包含重現步驟
 6. 遇到問題記錄在 memory 的 `lessons.md`
 
+## 部署文件維護規則（必須遵守）
+每次完成以下事項時，**必須**檢查並更新所有相關部署文件：
+- 完成一個 Phase
+- 修正錯誤（特別是部署/配置相關）
+- 部署方式有變動（如 named volume → bind mount）
+
+需檢查的部署文件清單：
+
+| 文件                         | 檢查重點                             |
+| ---------------------------- | ------------------------------------ |
+| `docs/rebuild-from-zero.md`  | 重建步驟是否與實際一致               |
+| `phase-N/README.md`          | 目錄結構、docker-compose、重現步驟   |
+| `phases/phase-N-RESULTS.md`  | 驗證結果、節點數、容器數             |
+| `config/docker-compose.yml`  | 範本是否標註過時/已被取代            |
+| `CLAUDE.md`                  | 技術決策、慣例是否更新               |
+| `tasks/todo.md`              | 進度追蹤                             |
+
 ## Key Technical Decisions
 | 決策 | 原因 |
 |------|------|
@@ -91,6 +108,9 @@ claude-workspace/
 需要密碼時參考該檔案，不要在其他地方重複記錄明文密碼。
 
 ## Phase Status
+
 - Phase 0: DONE — Claude Code 能力驗證通過
 - Phase 1: DONE — n8n + Dify + Mattermost 部署完成，端對端測試通過
-- Phase 2-7: NOT STARTED
+- Phase 2: DONE — 人人可用，16-node workflow（意圖路由 + 額度控制 + 週報）
+- Phase 3: DONE — 開發者 Agent，23-node workflow（code 子路由 + 直呼 Anthropic API）
+- Phase 4-7: NOT STARTED

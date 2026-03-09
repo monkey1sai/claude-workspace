@@ -1,12 +1,11 @@
-# 企業 AI 平台 — Docker Compose
-# 包含 n8n + Dify + PostgreSQL + Redis
+# 企業 AI 平台 — Docker Compose（Phase 0 原始範本）
+# ⚠️ 此檔案為初始設計範本，僅供參考
+# ⚠️ 實際部署請使用各 phase 目錄下的 docker-compose.yml：
+#   - phase-1/n8n/docker-compose.yml（n8n，bind mount）
+#   - phase-1/mattermost/docker-compose.yml（Mattermost + PostgreSQL，bind mount）
+#   - phase-1/dify/dify/docker/docker-compose.yaml（Dify，官方 compose）
 #
-# 使用方式：
-#   cp .env.example .env
-#   # 編輯 .env 設定密碼和 API Key
-#   docker compose up -d
-
-version: '3.8'
+# 原始設計包含 Slack（已改用 Mattermost）和 Redis（Phase 1 未使用）
 
 services:
   # ============================================
