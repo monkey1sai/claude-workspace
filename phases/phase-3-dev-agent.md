@@ -166,9 +166,11 @@ agent 任務僅限工程團隊
 
 ## Phase 3 完成標準
 
-- [ ] Claude Code CLI 安裝並可執行
-- [ ] Wrapper 能穩定呼叫 Claude Agent
-- [ ] Slack /code-review 指令可用
-- [ ] 至少支援 3 種程式任務
-- [ ] 安全控管（權限 + timeout + 額度）
-- [ ] 工程團隊回饋正面
+> ⚠️ 實際實作與原始計畫有差異：改用直接呼叫 Anthropic API（非 Claude Code CLI），介面為 Mattermost（非 Slack）。
+> 詳見 `phase-3/README.md` 的設計決策說明。
+
+- [x] AI 能處理 code 意圖的請求（直接呼叫 Anthropic API，非 CLI wrapper）
+- [x] Mattermost @ai-assistant 觸發 code 任務可用（取代原計畫的 Slack /code-review）
+- [x] 至少支援 3 種程式任務（實際支援 5 種：Bug 分析、測試生成、程式碼說明、PR Review、文件生成）
+- [x] 安全控管（共用 50 次/天額度 + 回覆截斷 14000 chars）
+- [ ] 工程團隊回饋正面（待試行）
